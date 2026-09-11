@@ -1,5 +1,5 @@
 /**
- * Albilad Bank Statement PDF Generator (Final Layout & Multiline Fixes)
+ * Albilad Bank Statement PDF Generator (Perfect Parsing Integration)
  * 
  * @module renderAlbilad
  */
@@ -8,12 +8,10 @@ import { pageLabel, yieldPaint, type TemplateArgs } from "./shared";
 import { shapeArabic } from "../arabic";
 import { PDFDocument, rgb } from "pdf-lib";
 
-// --- Constants & Layout Configuration ---
 const PAGE_WIDTH = 595;
 const PAGE_HEIGHT = 842;
 const TEXT_COLOR: Triplet = [0.08, 0.08, 0.08];
 
-// Text X-Coordinates for Table Data (Right-aligned)
 const TABLE_TEXT_X = {
   date: 545,     
   details: 435,  
@@ -22,7 +20,6 @@ const TABLE_TEXT_X = {
   balance: 103       
 };
 
-// --- Utility Functions ---
 const safeShapeText = (str: any): string => {
   const s = String(str || "").trim();
   if (!s || s === "-") return s;
@@ -48,9 +45,7 @@ const cleanMetadata = (value: any, regex?: RegExp): string => {
   return s;
 };
 
-// --- Main Render Function ---
 export async function renderAlbilad({ doc, fonts, statement, onProgress }: TemplateArgs) {
-  // 1. Filter out invalid rows
   const validRows = statement.rows.filter((row) => {
     const dateStr = String(row.date || "");
     const detailsStr = String(row.details || "");
@@ -62,7 +57,6 @@ export async function renderAlbilad({ doc, fonts, statement, onProgress }: Templ
     return !hasInvalidKeyword;
   });
 
-  // 2. Calculations for the final summary page
   let totalDeposits = 0;
   let totalWithdrawals = 0;
   
@@ -73,12 +67,11 @@ export async function renderAlbilad({ doc, fonts, statement, onProgress }: Templ
     if (!isNaN(debit)) totalWithdrawals += Math.abs(debit);
   }
 
-  // 3. Chunk rows into pages (13 rows perfectly fills the Albilad table layout)
+  // 13 صف عشان ندي مساحة للسطور وميسبش فراغ تحت
   const MAX_ROWS_PER_PAGE = 13;
   const paginatedGroups = chunk(validRows, MAX_ROWS_PER_PAGE);
   const totalPages = Math.max(paginatedGroups.length, 1);
 
-  // 4. Load & EMBED Templates
   let embeddedFirstPage: any;
   let embeddedLastPage: any;
   try {
@@ -95,12 +88,10 @@ export async function renderAlbilad({ doc, fonts, statement, onProgress }: Templ
     throw new Error("ملفات القوالب غير موجودة. تأكد من وجود albilad_first_page.pdf و albilad_last_page.pdf في مجلد public/templates");
   }
 
-  // 5. Extract and Clean Metadata
   const meta = (statement.meta as any) || {};
   
-  // Fix Account Type (Extracts "CA" from "CAنوع الحساب" or defaults to "حساب جاري")
-  const rawAccType = cleanMetadata(meta.accountType, /نوع|الحساب|:/g);
-  const accountType = rawAccType !== "-" && rawAccType !== "" ? rawAccType : "حساب جاري";
+  let rawAccType = cleanMetadata(meta.accountType);
+  const accountType = (rawAccType.toUpperCase() === "CA" || !rawAccType) ? "حساب جاري" : rawAccType;
   
   const accountNumber = cleanMetadata(meta.accountNumber, /الفترة|الفرع|رقم|:/);
   const ibanNumber = cleanMetadata(meta.iban, /الفرع|رقم|:/);
@@ -115,7 +106,6 @@ export async function renderAlbilad({ doc, fonts, statement, onProgress }: Templ
   }
   const openingBalance = meta.openingBalance != null ? cleanMetadata(meta.openingBalance, /رصيد|:/) : "-";
 
-  // 6. Render Pages Loop
   for (let pageIndex = 0; pageIndex < totalPages; pageIndex++) {
     const isLastPage = pageIndex === totalPages - 1;
     
@@ -130,10 +120,10 @@ export async function renderAlbilad({ doc, fonts, statement, onProgress }: Templ
     const pen = new Pen(page, fonts.regular);
     const currentPageRows = paginatedGroups[pageIndex] ?? [];
     
-    // --- Print Metadata (Values ONLY) ---
+    // الميتا داتا نازلة في مكانها المظبوط
     const VALUE_X = 450; 
-    let currentTextY = 720; 
-    const LINE_SPACING = 14;    
+    let currentTextY = 705; 
+    const LINE_SPACING = 14.5;    
     const FONT_SIZE = 9; 
 
     pen.text(safeShapeText(accountType), VALUE_X, currentTextY, FONT_SIZE, TEXT_COLOR, "right");
@@ -159,9 +149,8 @@ export async function renderAlbilad({ doc, fonts, statement, onProgress }: Templ
 
     pen.text(safeShapeText(openingBalance), VALUE_X, currentTextY, FONT_SIZE, TEXT_COLOR, "right");
 
-    // --- Print Table Rows ---
     const ROW_START_Y = 555; 
-    const FIXED_ROW_STEP = 33; // مسافة ثابتة بين كل عملية والتانية عشان تملى الجدول بانتظام
+    const FIXED_ROW_STEP = 33; 
     let rowY = ROW_START_Y;
     
     for (const row of currentPageRows) {
@@ -170,37 +159,34 @@ export async function renderAlbilad({ doc, fonts, statement, onProgress }: Templ
       const creditVal = extractStr(row.credit);
       const balanceVal = extractStr(row.balance);
       
-      // صيد تفاصيل العملية (بندور في كل الـ Keys اللي ممكن المابر يبعتها)
-      const rDetails = extractStr(row.details);
-      const rDesc = extractStr((row as any).description || (row as any).desc || (row as any).memo || "");
-      const rRef = extractStr((row as any).reference || (row as any).ref || "");
+      // هنا بيستقبل (التفاصيل، الوصف، المرجع) من البارسر
+      const rawRow = row as any;
+      const rDetails = extractStr(rawRow.details);
+      const rDesc = extractStr(rawRow.description);
+      const rRef = extractStr(rawRow.ref);
       
       const detailLines: string[] = [];
       if (rDetails) detailLines.push(rDetails);
       if (rDesc) detailLines.push(rDesc);
       if (rRef) detailLines.push(rRef);
 
-      // طباعة الداتا الثابتة (تاريخ، مدين، دائن، رصيد)
       pen.text(safeShapeText(dateVal), TABLE_TEXT_X.date, rowY, 9, TEXT_COLOR, "right");
       pen.text(safeShapeText(debitVal), TABLE_TEXT_X.debit, rowY, 9, TEXT_COLOR, "right");
       pen.text(safeShapeText(creditVal), TABLE_TEXT_X.credit, rowY, 9, TEXT_COLOR, "right");
       pen.text(safeShapeText(balanceVal), TABLE_TEXT_X.balance, rowY, 9, TEXT_COLOR, "right");
 
-      // طباعة سطور الوصف تحت بعضها
       let currentDetailY = rowY;
       for (const line of detailLines) {
         let safeLine = line.length > 55 ? line.substring(0, 52) + "..." : line;
+        // التشكيل بيتم بعد القص عشان الحروف ما تضربش
         pen.text(safeShapeText(safeLine), TABLE_TEXT_X.details, currentDetailY, 8, TEXT_COLOR, "right");
-        currentDetailY -= 11; // مسافة صغيرة بين السطور جوه نفس العملية
+        currentDetailY -= 10; 
       }
       
-      // ننزل للعملية اللي بعدها
       rowY -= FIXED_ROW_STEP;
     }
     
-    // --- Print Summary (Only on Last Page) ---
     if (isLastPage) {
-      // مربعات بيضاء دقيقة لمسح الأرقام القديمة
       const WIPE_Y = 112;
       const WIPE_HEIGHT = 20;
       
@@ -208,7 +194,6 @@ export async function renderAlbilad({ doc, fonts, statement, onProgress }: Templ
       page.drawRectangle({ x: 115, y: WIPE_Y, width: 60, height: WIPE_HEIGHT, color: rgb(1, 1, 1) });
       page.drawRectangle({ x: 185, y: WIPE_Y, width: 60, height: WIPE_HEIGHT, color: rgb(1, 1, 1) });
 
-      // طباعة المجاميع الجديدة
       const SUMMARY_Y = 120;
       const formatNum = (n: number) => n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
       
