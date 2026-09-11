@@ -13,35 +13,22 @@ function RootComponent() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
+  const [successMsg, setSuccessMsg] = useState("");
+  const [isSignUp, setIsSignUp] = useState(false); // دي اللي بتبدل بين اللوجين وإنشاء الحساب
 
   useEffect(() => {
     let isMounted = true;
-
-    // زودت التايم أوت شوية عشان يدي فرصة للنت البطيء
     const timer = setTimeout(() => {
-      if (isMounted) {
-        setLoading(false);
-      }
+      if (isMounted) setLoading(false);
     }, 3000);
 
-    supabase.auth.getSession()
-      .then(({ data: { session }, error }) => {
-        if (!isMounted) return;
-        if (error) {
-          console.error("Supabase Error:", error.message);
-        }
-        setSession(session);
-        setLoading(false);
-      })
-      .catch((err) => {
-        if (!isMounted) return;
-        console.error("Fetch Session Error:", err);
-        setLoading(false);
-      });
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!isMounted) return;
+      setSession(session);
+      setLoading(false);
+    });
 
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (!isMounted) return;
       setSession(session);
       setLoading(false);
@@ -54,96 +41,104 @@ function RootComponent() {
     };
   }, []);
 
-  const handleLogin = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg("");
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-    if (error) {
-      setErrorMsg("خطأ في الإيميل أو كلمة المرور، تأكد منها يا بطل.");
+    setSuccessMsg("");
+
+    if (isSignUp) {
+      // لو المستخدم اختار إنشاء حساب
+      const { error } = await supabase.auth.signUp({ email, password });
+      if (error) {
+        setErrorMsg(error.message || "حدث خطأ أثناء إنشاء الحساب.");
+      } else {
+        setSuccessMsg("تم إنشاء الحساب بنجاح! يمكنك تسجيل الدخول الآن.");
+        setIsSignUp(false); // نرجعه لشاشة اللوجين عشان يدخل
+        setPassword("");
+      }
+    } else {
+      // لو المستخدم بيعمل تسجيل دخول
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) {
+        setErrorMsg("خطأ في الإيميل أو كلمة المرور، تأكد منها يا بطل.");
+      }
     }
   };
 
-  // دالة منفصلة عشان نرندر المحتوى بس، ونحافظ على الـ Scripts بره
-  const renderContent = () => {
-    if (loading) {
-      return (
-        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', background: '#f8fafc', margin: 0 }}>
-          <h2 style={{ fontFamily: 'sans-serif', color: '#334155' }}>جاري تحميل النظام...</h2>
-        </div>
-      );
-    }
-
-    if (!session) {
-      return (
-        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', background: '#0f172a', margin: 0, fontFamily: 'sans-serif' }}>
-          <form onSubmit={handleLogin} style={{ background: '#1e293b', padding: '40px', borderRadius: '12px', boxShadow: '0 10px 25px rgba(0,0,0,0.3)', width: '350px', textAlign: 'right' }} dir="rtl">
-            <h2 style={{ color: '#fff', marginBottom: '20px', textAlign: 'center', fontSize: '22px' }}>تسجيل دخول Keshf</h2>
-            
-            {errorMsg && (
-              <div style={{ background: '#fee2e2', color: '#dc2626', padding: '10px', borderRadius: '6px', marginBottom: '15px', fontSize: '13px', textAlign: 'center' }}>
-                {errorMsg}
-              </div>
-            )}
-
-            <div style={{ marginBottom: '15px' }}>
-              <label style={{ display: 'block', color: '#94a3b8', marginBottom: '5px', fontSize: '14px' }}>البريد الإلكتروني</label>
-              <input 
-                type="email" 
-                value={email} 
-                onChange={(e) => setEmail(e.target.value)} 
-                required
-                style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #475569', background: '#0f172a', color: '#fff', boxSizing: 'border-box' }}
-              />
-            </div>
-
-            <div style={{ marginBottom: '20px' }}>
-              <label style={{ display: 'block', color: '#94a3b8', marginBottom: '5px', fontSize: '14px' }}>كلمة المرور</label>
-              <input 
-                type="password" 
-                value={password} 
-                onChange={(e) => setPassword(e.target.value)} 
-                required
-                style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #475569', background: '#0f172a', color: '#fff', boxSizing: 'border-box' }}
-              />
-            </div>
-
-            <button type="submit" style={{ width: '100%', background: '#2563eb', color: '#fff', padding: '12px', borderRadius: '6px', border: 'none', fontWeight: 'bold', cursor: 'pointer', fontSize: '15px' }}>
-              دخول
-            </button>
-          </form>
-        </div>
-      );
-    }
+  const renderAuthOverlay = () => {
+    // لو مسجل دخول بالفعل، مفيش داعي نعرض الشاشة دي
+    if (session) return null;
 
     return (
-      <>
-        <div style={{ position: 'absolute', top: '10px', left: '10px', zIndex: 9999 }}>
-          <button 
-            onClick={() => supabase.auth.signOut()} 
-            style={{ background: '#ef4444', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold' }}
-          >
-            تسجيل خروج
+      <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(15, 23, 42, 0.6)', backdropFilter: 'blur(8px)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 9999 }}>
+        <form onSubmit={handleSubmit} style={{ background: '#1e293b', padding: '40px', borderRadius: '12px', boxShadow: '0 10px 25px rgba(0,0,0,0.5)', width: '350px', textAlign: 'right', fontFamily: 'sans-serif' }} dir="rtl">
+          <h2 style={{ color: '#fff', marginBottom: '20px', textAlign: 'center', fontSize: '22px' }}>
+            {isSignUp ? "إنشاء حساب جديد" : "تسجيل دخول Keshf"}
+          </h2>
+          
+          {errorMsg && <div style={{ background: '#fee2e2', color: '#dc2626', padding: '10px', borderRadius: '6px', marginBottom: '15px', fontSize: '13px', textAlign: 'center' }}>{errorMsg}</div>}
+          {successMsg && <div style={{ background: '#dcfce7', color: '#166534', padding: '10px', borderRadius: '6px', marginBottom: '15px', fontSize: '13px', textAlign: 'center' }}>{successMsg}</div>}
+
+          <div style={{ marginBottom: '15px' }}>
+            <label style={{ display: 'block', color: '#94a3b8', marginBottom: '5px', fontSize: '14px' }}>البريد الإلكتروني</label>
+            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #475569', background: '#0f172a', color: '#fff', boxSizing: 'border-box' }} />
+          </div>
+
+          <div style={{ marginBottom: '20px' }}>
+            <label style={{ display: 'block', color: '#94a3b8', marginBottom: '5px', fontSize: '14px' }}>كلمة المرور</label>
+            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #475569', background: '#0f172a', color: '#fff', boxSizing: 'border-box' }} />
+          </div>
+
+          <button type="submit" style={{ width: '100%', background: '#2563eb', color: '#fff', padding: '12px', borderRadius: '6px', border: 'none', fontWeight: 'bold', cursor: 'pointer', fontSize: '15px' }}>
+            {isSignUp ? "إنشاء الحساب" : "دخول"}
           </button>
-        </div>
-        <PreviewHostBridge />
-        <AuthProvider>
-          <Outlet />
-        </AuthProvider>
-      </>
+
+          <div style={{ textAlign: 'center', marginTop: '15px' }}>
+            <button type="button" onClick={() => { setIsSignUp(!isSignUp); setErrorMsg(""); setSuccessMsg(""); }} style={{ background: 'none', border: 'none', color: '#93c5fd', cursor: 'pointer', textDecoration: 'underline', fontSize: '14px' }}>
+              {isSignUp ? "لديك حساب بالفعل؟ سجل دخولك" : "ليس لديك حساب؟ أنشئ حساباً جديداً"}
+            </button>
+          </div>
+        </form>
+      </div>
     );
   };
 
-  // الهيكل الأساسي اللي عمره ما هيخفي الـ Scripts
+  if (loading) {
+    return (
+      <html lang="en" className="antialiased" suppressHydrationWarning>
+        <head>
+          <HeadContent />
+        </head>
+        <body style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', background: '#f8fafc', margin: 0 }}>
+          <h2 style={{ fontFamily: 'sans-serif', color: '#334155' }}>جاري تحميل النظام...</h2>
+        </body>
+      </html>
+    );
+  }
+
   return (
     <html lang="en" className="antialiased" suppressHydrationWarning>
       <head>
         <HeadContent />
       </head>
       <body>
-        {renderContent()}
+        {/* التطبيق الأساسي بيترندر هنا في الخلفية */}
+        <PreviewHostBridge />
+        <AuthProvider>
+          <Outlet />
+        </AuthProvider>
+
+        {/* دي الشاشة الشفافة اللي بتظهر فوق التطبيق لو مفيش تسجيل دخول */}
+        {renderAuthOverlay()}
+
+        {/* زرار تسجيل الخروج بيظهر بس لو في سيشن */}
+        {session && (
+          <div style={{ position: 'absolute', top: '10px', left: '10px', zIndex: 9999 }}>
+            <button onClick={() => supabase.auth.signOut()} style={{ background: '#ef4444', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold' }}>
+              تسجيل خروج
+            </button>
+          </div>
+        )}
         <Scripts />
       </body>
     </html>
