@@ -1,5 +1,5 @@
 /**
- * SNB Bank Statement PDF Generator (Perfect Parsing Integration & Small File Size)
+ * SNB Bank Statement PDF Generator (Pixel-Perfect Template Integration)
  * 
  * @module renderSnb
  */
@@ -9,21 +9,21 @@ import { shapeArabic } from "../arabic";
 import { PDFDocument, rgb } from "pdf-lib";
 
 // --- Constants & Layout Configuration ---
-const PAGE_WIDTH = 842; // Landscape for SNB
+const PAGE_WIDTH = 842;  // SNB Landscape
 const PAGE_HEIGHT = 595;
 const TEXT_COLOR: Triplet = [0.08, 0.08, 0.08];
-const RED: Triplet = [0.72, 0.10, 0.10]; // لون المدين الأحمر
+const RED: Triplet = [0.72, 0.10, 0.10]; // لون المدين
 
-// إحداثيات عواميد الجدول (تقريبية وقابلة للتعديل بسهولة)
+// إحداثيات الأعمدة (متوسطة بالمللي على القالب الأصلي)
 const TABLE_TEXT_X = {
-  date: 785,     
-  details: 680,  
-  notes: 440,
-  ref: 350,
-  type: 275,
-  credit: 200,       
-  debit: 120,        
-  balance: 45       
+  date: 785,     // التاريخ (منتصف)
+  details: 735,  // التفاصيل (يمين عشان الكلام ياخد راحته للشمال)
+  notes: 430,    // ملاحظات (منتصف)
+  ref: 340,      // المرجع (منتصف)
+  type: 270,     // رمز العملية (منتصف)
+  credit: 195,   // دائن (منتصف)
+  debit: 120,    // مدين (منتصف)
+  balance: 50    // الرصيد (منتصف)
 };
 
 // --- Utility Functions ---
@@ -43,14 +43,23 @@ const extractStr = (val: any) => {
   return str;
 };
 
-const cleanMetadata = (value: any, regex?: RegExp): string => {
-  const s = extractStr(value);
-  if (!s) return "-";
-  if (regex) {
-    return s.split(regex)[0].trim() || "-";
+// دالة لقص النصوص الطويلة عشان ماتدخلش في العواميد التانية
+function splitText(text: string, maxLen: number): string[] {
+  if (!text) return [];
+  const words = text.split(" ");
+  const lines: string[] = [];
+  let currentLine = "";
+  for (const word of words) {
+      if ((currentLine + " " + word).length > maxLen) {
+          lines.push(currentLine);
+          currentLine = word;
+      } else {
+          currentLine = currentLine ? currentLine + " " + word : word;
+      }
   }
-  return s;
-};
+  if (currentLine) lines.push(currentLine);
+  return lines;
+}
 
 // --- Main Render Function ---
 export async function renderSnb({ doc, fonts, statement, onProgress }: TemplateArgs) {
@@ -58,15 +67,10 @@ export async function renderSnb({ doc, fonts, statement, onProgress }: TemplateA
   const validRows = statement.rows.filter((row) => {
     const dateStr = String(row.date || "");
     const detailsStr = String(row.details || "");
-    const hasInvalidKeyword = 
-        dateStr.includes("ميلادي") || 
-        detailsStr.includes("ميلادي") || 
-        dateStr.includes("هجري") || 
-        detailsStr.includes("هجري");
-    return !hasInvalidKeyword;
+    return !(dateStr.includes("ميلادي") || detailsStr.includes("التفاصيل") || dateStr.includes("التاريخ"));
   });
 
-  // 2. Calculations for the final summary page (عدد ومجموع العمليات)
+  // 2. Calculations for the final summary page
   let totalDeposits = 0;
   let totalWithdrawals = 0;
   let depositCount = 0;
@@ -86,8 +90,8 @@ export async function renderSnb({ doc, fonts, statement, onProgress }: TemplateA
   }
 
   // 3. Chunk rows into pages
-  const ROWS_FIRST_PAGE = 12; // الصفحة الأولى بتاخد عمليات أقل عشان الميتا داتا اللي فوق
-  const ROWS_MIDDLE_PAGE = 18; // الصفحة المتكررة بتاخد عمليات أكتر
+  const ROWS_FIRST_PAGE = 11; // عشان الميتا داتا واخدة مساحة
+  const ROWS_MIDDLE_PAGE = 22; // الجدول كامل
   
   const paginatedGroups: any[][] = [];
   if (validRows.length > 0) {
@@ -103,7 +107,7 @@ export async function renderSnb({ doc, fonts, statement, onProgress }: TemplateA
   
   const totalPages = Math.max(paginatedGroups.length, 1);
 
-  // 4. Load & EMBED Templates (عشان الحجم يفضل بالكيلوبايت)
+  // 4. Load & EMBED Templates
   let embeddedFirstPage: any;
   let embeddedMiddlePage: any;
   let embeddedLastPage: any;
@@ -121,70 +125,55 @@ export async function renderSnb({ doc, fonts, statement, onProgress }: TemplateA
     embeddedLastPage = lastPageForm;
   } catch (error) {
     console.error("⚠️ Failed to load SNB templates", error);
-    throw new Error("ملفات القوالب غير موجودة. تأكد من وجود snb_first_page.pdf و snb_middle_page.pdf و snb_last_page.pdf في مجلد public/templates");
+    throw new Error("تأكد من رفع القوالب: snb_first_page.pdf, snb_middle_page.pdf, snb_last_page.pdf");
   }
 
-  // 5. Extract and Clean Metadata
   const meta = (statement.meta as any) || {};
-  const customerName = cleanMetadata(meta.customer || meta.accountName);
-  const username = cleanMetadata(meta.username || meta.shortName || "-");
-  const accountNumber = cleanMetadata(meta.accountNumber, /الفترة|الفرع|رقم|:/);
-  
+
+  // 5. Render Pages Loop
   for (let pageIndex = 0; pageIndex < totalPages; pageIndex++) {
     const isFirstPage = pageIndex === 0;
     const isLastPage = pageIndex === totalPages - 1;
     
     const page = doc.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
     
-    // سحب القالب المناسب للصفحة
     let templateToDraw = embeddedMiddlePage;
     if (isFirstPage) templateToDraw = embeddedFirstPage;
-    // لو دي آخر صفحة والملف أكتر من صفحة، حط قالب المجاميع
     if (isLastPage && totalPages > 1) templateToDraw = embeddedLastPage;
-    // لو الملف كله صفحة واحدة، هيطبع قالب الصفحة الأولى، والمجاميع هتنزل تحت الجدول
     if (isFirstPage && isLastPage) templateToDraw = embeddedFirstPage; 
 
-    page.drawPage(templateToDraw, {
-      x: 0,
-      y: 0,
-      width: PAGE_WIDTH,
-      height: PAGE_HEIGHT,
-    });
+    page.drawPage(templateToDraw, { x: 0, y: 0, width: PAGE_WIDTH, height: PAGE_HEIGHT });
     
-    const pen = new Pen(page, fonts.regular); // هيستخدم الفونت NeoSans اللي هتحطه
+    const pen = new Pen(page, fonts.regular);
     const currentPageRows = paginatedGroups[pageIndex] ?? [];
     
-    // --- طباعة الميتا داتا في الصفحة الأولى ---
+    // --- طباعة الميتا داتا (الصفحة الأولى فقط) ---
     if (isFirstPage) {
-      const VAL_R_X = 730; // إحداثيات القيم اليمين
-      const VAL_L_X = 400; // إحداثيات القيم الشمال
+      // الأسماء فوق
+      pen.text(safeShapeText(meta.customer || meta.accountName || ""), 730, 480, 8.5, TEXT_COLOR, "right");
+      pen.text(safeShapeText(meta.username || meta.shortName || "demo"), 730, 465, 8.5, TEXT_COLOR, "right");
       
-      const metaY = 460; // ارتفاع البلوك الأول
+      // التاريخ والوقت
+      pen.text(safeShapeText(meta.reportDate || ""), 420, 510, 8.5, TEXT_COLOR, "center");
       
-      pen.text(safeShapeText(customerName), VAL_R_X, metaY, 8.5, TEXT_COLOR, "right");
-      pen.text(safeShapeText(username), VAL_R_X, metaY - 18, 8.5, TEXT_COLOR, "right");
-      
-      const dateStr = (meta.fromDate && meta.toDate) ? `${meta.fromDate} - ${meta.toDate}` : (meta.reportDate || "-");
-      pen.text(safeShapeText(dateStr), VAL_L_X, metaY, 8.5, TEXT_COLOR, "right");
-      
-      const filterY = metaY - 55; // ارتفاع بلوك المرشحات
-      
-      pen.text(shapeArabic("تنازلي"), VAL_R_X, filterY, 8.5, TEXT_COLOR, "right");
-      pen.text(safeShapeText(meta.toDate || "-"), VAL_R_X, filterY - 18, 8.5, TEXT_COLOR, "right");
-      pen.text(safeShapeText(accountNumber), VAL_R_X, filterY - 36, 8.5, TEXT_COLOR, "right");
-      pen.text(shapeArabic("الحالي"), VAL_R_X, filterY - 54, 8.5, TEXT_COLOR, "right");
-      pen.text(shapeArabic("الكل"), VAL_R_X, filterY - 72, 8.5, TEXT_COLOR, "right");
+      // المرشحات اليمين
+      pen.text(shapeArabic("تنازلي"), 730, 400, 8, TEXT_COLOR, "right");
+      pen.text(safeShapeText(meta.toDate || ""), 730, 385, 8, TEXT_COLOR, "right");
+      pen.text(safeShapeText(meta.accountNumber || ""), 730, 370, 8, TEXT_COLOR, "right");
+      pen.text(shapeArabic("الحالي"), 730, 355, 8, TEXT_COLOR, "right");
+      pen.text(shapeArabic("الكل"), 730, 340, 8, TEXT_COLOR, "right");
 
-      pen.text("500", VAL_L_X, filterY, 8.5, TEXT_COLOR, "right");
-      pen.text(safeShapeText(meta.fromDate || "-"), VAL_L_X, filterY - 18, 8.5, TEXT_COLOR, "right");
-      pen.text(shapeArabic("الحالي"), VAL_L_X, filterY - 36, 8.5, TEXT_COLOR, "right");
-      pen.text(shapeArabic("الكل"), VAL_L_X, filterY - 54, 8.5, TEXT_COLOR, "right");
+      // المرشحات الشمال
+      pen.text("500", 350, 400, 8, TEXT_COLOR, "right");
+      pen.text(safeShapeText(meta.fromDate || ""), 350, 385, 8, TEXT_COLOR, "right");
+      pen.text(shapeArabic("الحالي"), 350, 370, 8, TEXT_COLOR, "right");
+      pen.text(shapeArabic("الكل"), 350, 355, 8, TEXT_COLOR, "right");
     }
 
     // --- طباعة صفوف الجدول ---
-    // الصفحة الأولى بتبدأ من تحت شوية عشان الميتا داتا
-    const ROW_START_Y = isFirstPage ? 260 : 480; 
-    const FIXED_ROW_STEP = 23; // مسافة نزول السطر عشان يجي في الرمادي والأبيض بالمللي
+    // إحداثيات البداية متقاسة عشان تنزل على أول سطر جراي/أبيض بالظبط
+    const ROW_START_Y = isFirstPage ? 290 : 500; 
+    const FIXED_ROW_STEP = 20; // المسافة المثالية لسطور SNB
     let rowY = ROW_START_Y;
     
     for (const row of currentPageRows) {
@@ -200,47 +189,52 @@ export async function renderSnb({ doc, fonts, statement, onProgress }: TemplateA
       const rRef = extractStr(rawRow.ref || rawRow.reference || rawRow['المرجع'] || "");
       const rType = extractStr(rawRow.type || rawRow['رمز العملية'] || "");
 
-      // دمج التفاصيل والوصف في عمود "التفاصيل"
-      const detailLines: string[] = [];
-      if (rDetails) detailLines.push(rDetails);
-      if (rDesc) detailLines.push(rDesc);
-
-      pen.text(safeShapeText(dateVal), TABLE_TEXT_X.date, rowY, 8, TEXT_COLOR, "center");
-      pen.text(safeShapeText(rNotes), TABLE_TEXT_X.notes, rowY, 8, TEXT_COLOR, "center");
-      pen.text(safeShapeText(rRef), TABLE_TEXT_X.ref, rowY, 8, TEXT_COLOR, "center");
-      pen.text(safeShapeText(rType), TABLE_TEXT_X.type, rowY, 8, TEXT_COLOR, "center");
+      // طباعة الأعمدة العادية متسنتّرة
+      pen.text(safeShapeText(dateVal), TABLE_TEXT_X.date, rowY, 7.5, TEXT_COLOR, "center");
+      pen.text(safeShapeText(rNotes), TABLE_TEXT_X.notes, rowY, 7.5, TEXT_COLOR, "center");
+      pen.text(safeShapeText(rRef), TABLE_TEXT_X.ref, rowY, 7.5, TEXT_COLOR, "center");
+      pen.text(safeShapeText(rType), TABLE_TEXT_X.type, rowY, 7.5, TEXT_COLOR, "center");
       
-      pen.text(safeShapeText(debitVal ? "-" + debitVal : ""), TABLE_TEXT_X.debit, rowY, 8.5, RED, "center");
-      pen.text(safeShapeText(creditVal), TABLE_TEXT_X.credit, rowY, 8.5, TEXT_COLOR, "center");
-      pen.text(safeShapeText(balanceVal), TABLE_TEXT_X.balance, rowY, 8.5, TEXT_COLOR, "center");
+      if (debitVal) {
+        pen.text(safeShapeText("-" + debitVal), TABLE_TEXT_X.debit, rowY, 7.5, RED, "center");
+      }
+      if (creditVal) {
+        pen.text(safeShapeText(creditVal), TABLE_TEXT_X.credit, rowY, 7.5, TEXT_COLOR, "center");
+      }
+      pen.text(safeShapeText(balanceVal), TABLE_TEXT_X.balance, rowY, 7.5, TEXT_COLOR, "center");
 
-      // طباعة التفاصيل سطور تحت بعضها
-      let currentDetailY = rowY + 2; 
-      for (const line of detailLines) {
-        let safeLine = line.length > 55 ? line.substring(0, 52) + "..." : line;
-        pen.text(safeShapeText(safeLine), TABLE_TEXT_X.details, currentDetailY, 7.5, TEXT_COLOR, "right");
+      // طباعة التفاصيل: دمج الوصف مع التفاصيل وقصهم لو السطر طويل عشان ما يضربش في العمود اللي جنبه
+      const fullDetails = `${rDetails} ${rDesc}`.trim();
+      const detailLines = splitText(fullDetails, 42); // أقصى حد للسطر 42 حرف
+      
+      let currentDetailY = rowY; 
+      for (let i = 0; i < Math.min(detailLines.length, 2); i++) { // أقصى حاجة سطرين عشان ما يخرجش بره الخلية
+        pen.text(safeShapeText(detailLines[i]), TABLE_TEXT_X.details, currentDetailY, 7.5, TEXT_COLOR, "right");
         currentDetailY -= 9; 
       }
       
       rowY -= FIXED_ROW_STEP;
     }
     
-    // --- طباعة المجاميع (في الصفحة الأخيرة فقط) ---
+    // --- طباعة المجاميع (في الصفحة الأخيرة تحت الجدول مباشرة) ---
     if (isLastPage) {
-      const SUMMARY_Y = 60; // إحداثيات السطر الأخير خالص في الصفحة
+      // نحسب الـ Y بتاع المجاميع بحيث يكون تحت آخر سطر وقفنا عنده بمسافة شيك
+      const SUMMARY_Y = rowY - 15; 
       const formatNum = (n: number) => n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
       
-      // مسح الأرقام القديمة بمربعات بيضاء دقيقة
-      page.drawRectangle({ x: 630, y: SUMMARY_Y - 10, width: 80, height: 25, color: rgb(1, 1, 1) });
-      page.drawRectangle({ x: 440, y: SUMMARY_Y - 10, width: 120, height: 25, color: rgb(1, 1, 1) });
-      page.drawRectangle({ x: 250, y: SUMMARY_Y - 10, width: 80, height: 25, color: rgb(1, 1, 1) });
-      page.drawRectangle({ x: 80,  y: SUMMARY_Y - 10, width: 120, height: 25, color: rgb(1, 1, 1) });
+      // بلوك المدين (يمين)
+      pen.text(shapeArabic("إجمالي معاملات المدين"), 820, SUMMARY_Y, 8.5, TEXT_COLOR, "right");
+      pen.text(shapeArabic("إجمالي المبلغ المدين"), 820, SUMMARY_Y - 15, 8.5, TEXT_COLOR, "right");
+      
+      pen.text(safeShapeText(String(withdrawalCount)), 710, SUMMARY_Y, 8.5, TEXT_COLOR, "right");
+      pen.text(safeShapeText("-" + formatNum(totalWithdrawals)), 710, SUMMARY_Y - 15, 8.5, RED, "right");
 
-      // طباعة الأرقام الجديدة المحسوبة من الكود
-      pen.text(safeShapeText(String(depositCount)), 670, SUMMARY_Y, 9, TEXT_COLOR, "center"); // عدد معاملات الدائن
-      pen.text(safeShapeText(formatNum(totalDeposits)), 500, SUMMARY_Y, 9, TEXT_COLOR, "center"); // إجمالي الدائن
-      pen.text(safeShapeText(String(withdrawalCount)), 290, SUMMARY_Y, 9, TEXT_COLOR, "center"); // عدد معاملات المدين
-      pen.text(safeShapeText("-" + formatNum(totalWithdrawals)), 140, SUMMARY_Y, 9, RED, "center"); // إجمالي المدين
+      // بلوك الدائن (شمال شوية)
+      pen.text(shapeArabic("إجمالي معاملات الدائن"), 550, SUMMARY_Y, 8.5, TEXT_COLOR, "right");
+      pen.text(shapeArabic("إجمالي المبلغ الدائن"), 550, SUMMARY_Y - 15, 8.5, TEXT_COLOR, "right");
+      
+      pen.text(safeShapeText(String(depositCount)), 440, SUMMARY_Y, 8.5, TEXT_COLOR, "right");
+      pen.text(safeShapeText(formatNum(totalDeposits)), 440, SUMMARY_Y - 15, 8.5, TEXT_COLOR, "right");
     }
     
     onProgress?.((pageIndex + 1) / totalPages, `Composing page ${pageIndex + 1} of ${totalPages}`);
