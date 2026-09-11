@@ -1,5 +1,5 @@
 /**
- * Albilad Bank Statement PDF Generator (Optimized Size & Layout)
+ * Albilad Bank Statement PDF Generator (Multiline Details & Summary Wipe Fix)
  * 
  * @module renderAlbilad
  */
@@ -16,7 +16,7 @@ const TEXT_COLOR: Triplet = [0.08, 0.08, 0.08];
 // Text X-Coordinates for Table Data (Right-aligned)
 const TABLE_TEXT_X = {
   date: 545,     
-  details: 435,  // زقناها شوية عشان تستوعب الكلام المدمج
+  details: 435,  
   debit: 243,        
   credit: 173,       
   balance: 103       
@@ -32,9 +32,16 @@ const safeShapeText = (str: any): string => {
   return s;
 };
 
+const extractStr = (val: any) => {
+  if (!val) return "";
+  const str = String(val).trim();
+  if (str === "-" || str.toLowerCase() === "undefined" || str.toLowerCase() === "nan" || str.toLowerCase() === "null") return "";
+  return str;
+};
+
 const cleanMetadata = (value: any, regex?: RegExp): string => {
-  const s = String(value || "-").trim();
-  if (s === "-" || s.toLowerCase() === "undefined" || s.toLowerCase() === "null") return "-";
+  const s = extractStr(value);
+  if (!s) return "-";
   if (regex) {
     return s.split(regex)[0].trim() || "-";
   }
@@ -66,12 +73,12 @@ export async function renderAlbilad({ doc, fonts, statement, onProgress }: Templ
     if (!isNaN(debit)) totalWithdrawals += Math.abs(debit);
   }
 
-  // 3. Chunk rows into pages (Reduced to 12 rows for better spacing and long texts)
-  const MAX_ROWS_PER_PAGE = 12;
+  // 3. Chunk rows into pages (Reduced to 9 to allow up to 3 lines per row safely)
+  const MAX_ROWS_PER_PAGE = 9;
   const paginatedGroups = chunk(validRows, MAX_ROWS_PER_PAGE);
   const totalPages = Math.max(paginatedGroups.length, 1);
 
-  // 4. Load & EMBED Templates (This fixes the 35MB file size issue!)
+  // 4. Load & EMBED Templates (Lightweight)
   let embeddedFirstPage: any;
   let embeddedLastPage: any;
   try {
@@ -108,7 +115,6 @@ export async function renderAlbilad({ doc, fonts, statement, onProgress }: Templ
   for (let pageIndex = 0; pageIndex < totalPages; pageIndex++) {
     const isLastPage = pageIndex === totalPages - 1;
     
-    // Create blank page and draw the embedded template over it
     const page = doc.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
     page.drawPage(isLastPage ? embeddedLastPage : embeddedFirstPage, {
       x: 0,
@@ -120,8 +126,8 @@ export async function renderAlbilad({ doc, fonts, statement, onProgress }: Templ
     const pen = new Pen(page, fonts.regular);
     const currentPageRows = paginatedGroups[pageIndex] ?? [];
     
-    // --- Print Metadata (Values ONLY, no labels) ---
-    const VALUE_X = 450; // إحداثيات الداتا عشان تنزل جنب الكلمات المطبوعة في القالب
+    // --- Print Metadata (Values ONLY) ---
+    const VALUE_X = 450; 
     let currentTextY = 720; 
     const LINE_SPACING = 14;    
     const FONT_SIZE = 9; 
@@ -149,45 +155,61 @@ export async function renderAlbilad({ doc, fonts, statement, onProgress }: Templ
 
     pen.text(safeShapeText(openingBalance), VALUE_X, currentTextY, FONT_SIZE, TEXT_COLOR, "right");
 
-    // --- Print Table Rows ---
+    // --- Print Table Rows (With Multiline Details) ---
     const ROW_START_Y = 555; 
-    const ROW_HEIGHT = 35; // كبرنا المسافة عشان الداتا متبقاش لازقة في بعض
     let rowY = ROW_START_Y;
     
     for (const row of currentPageRows) {
       const dateVal = (row.date || "").slice(0, 10);
+      const debitVal = extractStr(row.debit);
+      const creditVal = extractStr(row.credit);
+      const balanceVal = extractStr(row.balance);
       
-      // دمج التفاصيل والوصف ورقم المرجع في سطر واحد
-      const rDetails = String(row.details || "").trim();
-      const rDesc = String((row as any).description || "").trim();
-      const rRef = String((row as any).reference || (row as any).ref || "").trim();
+      // تجهيز سطور تفاصيل العملية المتعددة
+      const rDetails = extractStr(row.details);
+      const rDesc = extractStr((row as any).description);
+      const rRef = extractStr((row as any).reference || (row as any).ref);
       
-      let combinedDetails = `${rDetails} ${rDesc !== "-" && rDesc !== "undefined" ? rDesc : ""} ${rRef !== "-" && rRef !== "undefined" ? rRef : ""}`.trim();
-      
-      // تقصير النص لو طويل جداً عشان ما يدخلش على الأرقام
-      if (combinedDetails.length > 70) {
-        combinedDetails = combinedDetails.substring(0, 68) + "..";
-      }
+      const detailLines: string[] = [];
+      if (rDetails) detailLines.push(rDetails);
+      if (rDesc) detailLines.push(rDesc);
+      if (rRef) detailLines.push(rRef);
 
-      const debitVal = row.debit && String(row.debit).toLowerCase() !== "nan" ? String(row.debit) : "";
-      const creditVal = row.credit && String(row.credit).toLowerCase() !== "nan" ? String(row.credit) : "";
-      const balanceVal = row.balance || "";
-
+      // طباعة الداتا الثابتة على نفس خط الـ Y
       pen.text(safeShapeText(dateVal), TABLE_TEXT_X.date, rowY, 9, TEXT_COLOR, "right");
-      // تصغير الفونت لـ 7 واستخدام النص المدمج
-      pen.text(safeShapeText(combinedDetails), TABLE_TEXT_X.details, rowY, 7, TEXT_COLOR, "right");
-      
       pen.text(safeShapeText(debitVal), TABLE_TEXT_X.debit, rowY, 9, TEXT_COLOR, "right");
       pen.text(safeShapeText(creditVal), TABLE_TEXT_X.credit, rowY, 9, TEXT_COLOR, "right");
       pen.text(safeShapeText(balanceVal), TABLE_TEXT_X.balance, rowY, 9, TEXT_COLOR, "right");
 
-      rowY -= ROW_HEIGHT;
+      // طباعة تفاصيل العملية (سطر تحت سطر)
+      let currentDetailY = rowY;
+      for (const line of detailLines) {
+        // لو السطر طويل جداً نقص منه عشان ما يخشش في الأرقام
+        let safeLine = line.length > 55 ? line.substring(0, 52) + "..." : line;
+        pen.text(safeShapeText(safeLine), TABLE_TEXT_X.details, currentDetailY, 8, TEXT_COLOR, "right");
+        currentDetailY -= 12; // ننزل 12 بيكسل للسطر اللي بعده جوه نفس الخلية
+      }
+      
+      // ننزل للعملية اللي بعدها بمسافة ديناميكية على حسب عدد السطور
+      const rowStep = Math.max(30, detailLines.length * 12 + 10);
+      rowY -= rowStep;
     }
     
     // --- Print Summary (Only on Last Page) ---
     if (isLastPage) {
-      // نزلنا المجاميع لتحت عشان تنزل جوه المربعات بالظبط
-      const SUMMARY_Y = 85; 
+      // 1. مسح الأرقام القديمة بمربعات بيضاء دقيقة عشان مانمسحش الخطوط بالطول
+      const WIPE_Y = 112;
+      const WIPE_HEIGHT = 20;
+      
+      // مربع مسح الرصيد
+      page.drawRectangle({ x: 45, y: WIPE_Y, width: 60, height: WIPE_HEIGHT, color: rgb(1, 1, 1) });
+      // مربع مسح الإيداعات
+      page.drawRectangle({ x: 115, y: WIPE_Y, width: 60, height: WIPE_HEIGHT, color: rgb(1, 1, 1) });
+      // مربع مسح السحوبات
+      page.drawRectangle({ x: 185, y: WIPE_Y, width: 60, height: WIPE_HEIGHT, color: rgb(1, 1, 1) });
+
+      // 2. طباعة المجاميع الجديدة فوق المربعات البيضاء
+      const SUMMARY_Y = 120; // متظبطة بالمللي مكان الأرقام القديمة
       const formatNum = (n: number) => n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
       
       pen.text(safeShapeText(formatNum(totalDeposits)), TABLE_TEXT_X.credit, SUMMARY_Y, 9, TEXT_COLOR, "right");
