@@ -14,7 +14,7 @@ function RootComponent() {
   const [password, setPassword] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
-  const [isSignUp, setIsSignUp] = useState(false); // دي اللي بتبدل بين اللوجين وإنشاء الحساب
+  const [isSignUp, setIsSignUp] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -47,17 +47,15 @@ function RootComponent() {
     setSuccessMsg("");
 
     if (isSignUp) {
-      // لو المستخدم اختار إنشاء حساب
       const { error } = await supabase.auth.signUp({ email, password });
       if (error) {
         setErrorMsg(error.message || "حدث خطأ أثناء إنشاء الحساب.");
       } else {
         setSuccessMsg("تم إنشاء الحساب بنجاح! يمكنك تسجيل الدخول الآن.");
-        setIsSignUp(false); // نرجعه لشاشة اللوجين عشان يدخل
+        setIsSignUp(false);
         setPassword("");
       }
     } else {
-      // لو المستخدم بيعمل تسجيل دخول
       const { error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) {
         setErrorMsg("خطأ في الإيميل أو كلمة المرور، تأكد منها يا بطل.");
@@ -66,7 +64,6 @@ function RootComponent() {
   };
 
   const renderAuthOverlay = () => {
-    // لو مسجل دخول بالفعل، مفيش داعي نعرض الشاشة دي
     if (session) return null;
 
     return (
@@ -103,42 +100,33 @@ function RootComponent() {
     );
   };
 
-  if (loading) {
-    return (
-      <html lang="en" className="antialiased" suppressHydrationWarning>
-        <head>
-          <HeadContent />
-        </head>
-        <body style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', background: '#f8fafc', margin: 0 }}>
-          <h2 style={{ fontFamily: 'sans-serif', color: '#334155' }}>جاري تحميل النظام...</h2>
-        </body>
-      </html>
-    );
-  }
-
   return (
     <html lang="en" className="antialiased" suppressHydrationWarning>
       <head>
         <HeadContent />
       </head>
       <body>
-        {/* التطبيق الأساسي بيترندر هنا في الخلفية */}
-        <PreviewHostBridge />
-        <AuthProvider>
-          <Outlet />
-        </AuthProvider>
-
-        {/* دي الشاشة الشفافة اللي بتظهر فوق التطبيق لو مفيش تسجيل دخول */}
-        {renderAuthOverlay()}
-
-        {/* زرار تسجيل الخروج بيظهر بس لو في سيشن */}
-        {session && (
-          <div style={{ position: 'absolute', top: '10px', left: '10px', zIndex: 9999 }}>
-            <button onClick={() => supabase.auth.signOut()} style={{ background: '#ef4444', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold' }}>
-              تسجيل خروج
-            </button>
+        {loading ? (
+          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', background: '#f8fafc', margin: 0 }}>
+            <h2 style={{ fontFamily: 'sans-serif', color: '#334155' }}>جاري تحميل النظام...</h2>
           </div>
+        ) : (
+          <>
+            <PreviewHostBridge />
+            <AuthProvider>
+              <Outlet />
+            </AuthProvider>
+            {renderAuthOverlay()}
+            {session && (
+              <div style={{ position: 'absolute', top: '10px', left: '10px', zIndex: 9999 }}>
+                <button onClick={() => supabase.auth.signOut()} style={{ background: '#ef4444', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold' }}>
+                  تسجيل خروج
+                </button>
+              </div>
+            )}
+          </>
         )}
+        {/* السكريبت ده هو اللي كان بيعملنا الأزمة لما بيختفي! */}
         <Scripts />
       </body>
     </html>
