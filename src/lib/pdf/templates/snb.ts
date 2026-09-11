@@ -9,7 +9,7 @@ const RED: Triplet = [0.72, 0.10, 0.10];
 const GREEN_TEXT: Triplet = [0.05, 0.50, 0.16];
 const GREEN: Triplet = [0.043, 0.42, 0.227];
 const DEEP: Triplet = [0.02, 0.18, 0.1];
-const WASH: Triplet = [0.97, 0.98, 0.97];
+const WASH: Triplet = [0.95, 0.96, 0.95]; // درجة أغمق سنة عشان الـ Shadow يبان أحلى
 const WHITE: Triplet = [1, 1, 1];
 const INK: Triplet = [0.08, 0.08, 0.08];
 const GRID: Triplet = [0.78, 0.83, 0.80];
@@ -122,21 +122,15 @@ export async function renderSnb({ doc, fonts, statement, onProgress }: TemplateA
     const pageRows = pages[p] || [];
 
     // =====================================================
-    // ☢️ الإبادة الذكية الدقيقة (السر كله هنا)
+    // ☢️ الإبادة الذكية الدقيقة
     // =====================================================
     if (templateDoc) {
       if (isPortal) {
         if (isFirst) {
-          // 🧽 1. مسح من تحت اللوجو مباشرة لحد الفوتر (هتطير خط الديمو والتاريخ المزعج تماماً)
           pen.rect(10, 75, PAGE_W - 20, PAGE_H - 140, WHITE);
-          
-          // 🧽 2. مسح الزاوية اليمين العلوية للسقف (تمسح الحسابات الجارية القديمة المكررة)
           pen.rect(PAGE_W - 250, PAGE_H - 90, 240, 90, WHITE);
-          
-          // 🧽 3. مسح الزاوية الشمال العلوية للسقف (تمسح التاريخ القديم المطبوع)
           pen.rect(5, PAGE_H - 90, 250, 90, WHITE);
         } else {
-          // مسح الصفحة التانية من السقف للحفاظ على الفوتر الأخضر فقط
           pen.rect(10, 75, PAGE_W - 20, PAGE_H - 75, WHITE);
         }
       } else {
@@ -148,7 +142,6 @@ export async function renderSnb({ doc, fonts, statement, onProgress }: TemplateA
         }
       }
 
-      // مسح أرقام الصفحات القديمة يميناً ويساراً في الأسفل فقط
       pen.rect(5, 5, 150, 30, WHITE);
       pen.rect(PAGE_W - 155, 5, 150, 30, WHITE);
     }
@@ -158,7 +151,7 @@ export async function renderSnb({ doc, fonts, statement, onProgress }: TemplateA
     // =====================================================
     if (isPortal) {
       const rowH = 22;
-      let y = PAGE_H - 60;
+      let y = 0;
 
       if (isFirst) {
         const hTop = PAGE_H - 80; 
@@ -168,30 +161,25 @@ export async function renderSnb({ doc, fonts, statement, onProgress }: TemplateA
         
         const infoY = hTop - 25;
         
-        // إسم العميل
         pen.text(shapeArabic("إسم العميل:"), 820, infoY, 8.5, INK, "right");
         pen.text(safeShape(m.customer || m.accountName || "—"), 740, infoY, 8.5, INK, "right");
         
-        // اسم المستخدم
         pen.text(shapeArabic("اسم المستخدم:"), 820, infoY - 16, 8.5, INK, "right");
         pen.text(safeShape((m as any).username || "—"), 740, infoY - 16, 8.5, INK, "right");
 
-        // رقم الحساب
         pen.text(safeAccount(m.accountNumber), 740, infoY - 32, 8.5, INK, "right");
 
-        // التاريخ
         pen.text(shapeArabic("التاريخ:"), 480, infoY, 8.5, INK, "right");
         const dateStr = (m.fromDate && m.toDate) ? `${m.fromDate} - ${m.toDate}` : (m.toDate || m.fromDate || "—");
         pen.text(safeShape(dateStr), 420, infoY, 8.5, INK, "right");
 
-        // --- 🎯 قسم المرشحات (مضغوط وصغير ومفيش تحته داتا بايظة) ---
+        // --- المرشحات ---
         const fTop = infoY - 48; 
         pen.text(shapeArabic("المرشحات"), 820, fTop, 9, INK, "right");
         pen.line(15, fTop - 8, 820, fTop - 8, GRID, 0.5); 
 
         const fStep = 14;
 
-        // عمود المرشحات 1
         pen.text(shapeArabic("ترتيب التاريخ:"), 820, fTop - 20, 7.5, INK, "right");
         pen.text(shapeArabic("تنازلي"), 730, fTop - 20, 7.5, INK, "right");
 
@@ -207,7 +195,6 @@ export async function renderSnb({ doc, fonts, statement, onProgress }: TemplateA
         pen.text(shapeArabic("نوع العملية:"), 820, fTop - 20 - fStep * 4, 7.5, INK, "right");
         pen.text(shapeArabic("الكل"), 730, fTop - 20 - fStep * 4, 7.5, INK, "right");
 
-        // عمود المرشحات 2
         pen.text(shapeArabic("عدد النتائج في كل صفحة:"), 480, fTop - 20, 7.5, INK, "center");
         pen.text("500", 350, fTop - 20, 7.5, INK, "right");
 
@@ -220,25 +207,40 @@ export async function renderSnb({ doc, fonts, statement, onProgress }: TemplateA
         pen.text(shapeArabic("دائن/مدين:"), 480, fTop - 20 - fStep * 3, 7.5, INK, "center");
         pen.text(shapeArabic("الكل"), 350, fTop - 20 - fStep * 3, 7.5, INK, "right");
 
-        // بداية الجدول للصفحة الأولى
-        y = fTop - 20 - (fStep * 4) - 15;
+        // نزلنا بالـ Y شوية عشان نوسع مكان للبار الأخضر الغامق الجديد
+        y = fTop - 20 - (fStep * 4) - 35;
       } else {
-        // بداية الجدول لباقي الصفحات 
-        y = PAGE_H - 40;
+        y = PAGE_H - 60;
       }
 
-      // هيدر الجدول الملون
+      // --- التعديل السحري للألوان والهيدر هنا ---
+      
+      // 1. البار الأخضر الغامق فوق الجدول
+      const darkBarY = y + rowH;
+      pen.rect(15, darkBarY, PAGE_W - 30, rowH, GREEN);
+      pen.text(shapeArabic("تفاصيل نتائج البحث"), 815, darkBarY + 6, 8.5, WHITE, "right");
+
+      // 2. هيدر الأعمدة الأخضر الفاتح والكلام فيه أخضر غامق
       pen.rect(15, y, PAGE_W - 30, rowH, PORTAL_LIGHT);
       for (const col of portalCols) {
         const cx = col.x0 + (col.x1 - col.x0) / 2;
-        pen.text(shapeArabic(col.t), cx, y + 6, 7.5, INK, "center");
+        pen.text(shapeArabic(col.t), cx, y + 6, 7.5, GREEN, "center"); // الكلام أخضر زي البنك
       }
 
       const xs = [15, 80, 160, 240, 300, 380, 480, 750, 820];
-      const tableHeaderY = y + rowH;
+      
+      // 3. فواصل بيضاء بين أسماء الأعمدة بس
+      for (const x of xs) {
+        if (x !== 15 && x !== 820) {
+          pen.line(x, y, x, y + rowH, WHITE, 1.2);
+        }
+      }
+
+      const rowsStartY = y; // عشان نوقف خطوط الجدول لحد هنا ومتبوظش الهيدر
 
       pageRows.forEach((row, idx) => {
         y -= rowH;
+        // 4. الظل الرمادي المضبوط (Zebra Shadow)
         pen.rect(15, y, PAGE_W - 30, rowH, idx % 2 === 0 ? WHITE : WASH);
 
         pen.text(row.date ? String(row.date).slice(0, 10) : "—", portalCols[0].x0 + 35, y + 6, 7.5, INK, "center");
@@ -255,7 +257,6 @@ export async function renderSnb({ doc, fonts, statement, onProgress }: TemplateA
         const typ = (row as any).description ? safeShape((row as any).description) : "—";
         pen.text(pen.wrap(typ, 55, 6.5)[0] ?? "—", portalCols[4].x1 - 3, y + 6, 6.5, INK, "right");
 
-        // الأرقام الملونة
         const cr = safeMoney(row.credit);
         if (cr !== "—") {
           pen.text(cr, portalCols[5].x0 + 40, y + 6, 7.5, GREEN_TEXT, "center");
@@ -275,10 +276,10 @@ export async function renderSnb({ doc, fonts, statement, onProgress }: TemplateA
         pen.line(15, y, 820, y, GRID, 0.4);
       });
 
-      // تقفيل الجدول
+      // 5. تقفيل الجدول بالخطوط الرمادية في منطقة البيانات بس (عشان متبوظش شكل الهيدر الأخضر)
       pen.line(15, y, 820, y, GRID, 1.0);
       for (const x of xs) {
-        pen.line(x, y, x, tableHeaderY, GRID, 0.9);
+        pen.line(x, y, x, rowsStartY, GRID, 0.6);
       }
     } 
     // =====================================================
