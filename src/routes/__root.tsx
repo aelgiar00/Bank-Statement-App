@@ -15,8 +15,18 @@ function RootComponent() {
   const [errorMsg, setErrorMsg] = useState("");
 
   useEffect(() => {
+    let isMounted = true;
+
+    // تفعيل تايم أوت طوارئ (لو سوبابيس اتأخر، فك التعليقة فوراً خلال ثانية)
+    const timer = setTimeout(() => {
+      if (isMounted && loading) {
+        setLoading(false);
+      }
+    }, 1000);
+
     supabase.auth.getSession()
       .then(({ data: { session }, error }) => {
+        if (!isMounted) return;
         if (error) {
           console.error("Supabase Error:", error.message);
         }
@@ -24,18 +34,24 @@ function RootComponent() {
         setLoading(false);
       })
       .catch((err) => {
+        if (!isMounted) return;
         console.error("Fetch Session Error:", err);
-        setLoading(false); // دي أهم حتة عشان الشاشة متفضلش معلقة
+        setLoading(false);
       });
 
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!isMounted) return;
       setSession(session);
       setLoading(false);
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      isMounted = false;
+      clearTimeout(timer);
+      subscription.unsubscribe();
+    };
   }, []);
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -156,7 +172,7 @@ export const Route = createRootRoute({
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
       {
-        rel: "stylesheet",
+        name: "stylesheet",
         href: "https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&family=Outfit:wght@300;400;500;600&display=swap",
       },
     ],
