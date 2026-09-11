@@ -167,13 +167,14 @@ export function AtelierApp() {
           </div>
 
           <div className="grid gap-0 lg:grid-cols-[240px_1fr]">
-            <aside className="border-border bg-surface/70 p-4 lg:border-e">
+            {/* هنا عدلنا الـ aside عشان يبقى Grid متجاوب على الموبايل ويفصل بخط من تحت */}
+            <aside className="border-b border-border bg-surface/70 p-4 lg:border-b-0 lg:border-e">
               <p className="mb-3 text-[11px] tracking-[0.18em] text-subtle uppercase">{t.banks}</p>
-              <ul className="flex gap-2 overflow-x-auto pb-1 lg:flex-col lg:overflow-visible">
+              <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:flex lg:flex-col lg:overflow-visible">
                 {BANKS.map((b) => {
                   const active = b.id === bankId;
                   return (
-                    <li key={b.id} className="shrink-0">
+                    <li key={b.id} className="shrink-0 min-w-0">
                       <button
                         type="button"
                         onClick={() => {
@@ -181,7 +182,7 @@ export function AtelierApp() {
                           if (statement) setFileName(suggestedFilename(statement, b.id));
                         }}
                         className={cn(
-                          "flex w-full min-w-[10.5rem] items-center gap-3 rounded-[var(--radius-md)] px-3 py-2.5 text-start transition-[background-color,box-shadow] duration-[var(--motion-quick)]",
+                          "flex w-full min-w-0 items-center gap-2.5 rounded-[var(--radius-md)] px-3 py-2.5 text-start transition-[background-color,box-shadow] duration-[var(--motion-quick)]",
                           active
                             ? "bg-card shadow-[var(--shadow-border-hover)]"
                             : "hover:bg-surface-hover",
@@ -192,9 +193,9 @@ export function AtelierApp() {
                           style={{ background: b.accentHex }}
                           aria-hidden
                         />
-                        <span>
-                          <span className="block text-sm text-ink">{rtl ? b.nameAr : b.nameEn}</span>
-                          <span className="block text-[11px] text-subtle">
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-sm text-ink">{rtl ? b.nameAr : b.nameEn}</span>
+                          <span className="block truncate text-[11px] text-subtle">
                             {b.city} · {b.established}
                           </span>
                         </span>
@@ -399,7 +400,7 @@ function Ledger({
 
 function Meta({ label, value }: { label: string; value: string }) {
   return (
-    <div>
+    <div className="min-w-0">
       <p className="text-[11px] tracking-[0.16em] text-subtle uppercase">{label}</p>
       <p className="mt-1 truncate text-sm text-ink">{value}</p>
     </div>
