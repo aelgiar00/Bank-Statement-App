@@ -1,0 +1,133 @@
+@import "tailwindcss";
+
+@theme {
+  --font-display: "Cormorant Garamond", "Iowan Old Style", "Palatino Linotype", serif;
+  --font-sans: "Outfit", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+
+  --color-paper: #f3edf7;
+  --color-paper-deep: #e8dfef;
+  --color-surface: #fbf7fe;
+  --color-surface-hover: #efe6f6;
+  --color-card: #fffcff;
+  --color-ink: #241b33;
+  --color-foreground: #241b33;
+  --color-muted: #6e627f;
+  --color-subtle: #8a7d9a;
+  --color-accent: #5c3d8f;
+  --color-accent-hover: #4c3278;
+  --color-accent-foreground: #fbf7fe;
+  --color-lilac: #c4b0e0;
+  --color-haze: #ddd1ea;
+  --color-ring: #5c3d8f;
+  --color-background: #f3edf7;
+  --color-border: color-mix(in oklab, var(--color-ink) 10%, transparent);
+  --color-danger: #8f3d4c;
+  --color-ok: #3d6b52;
+
+  --radius-xs: 4px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+  --radius-2xl: 32px;
+
+  --shadow-border:
+    0px 0px 0px 1px rgba(36, 27, 51, 0.06),
+    0px 1px 2px -1px rgba(36, 27, 51, 0.06),
+    0px 2px 4px 0px rgba(36, 27, 51, 0.04);
+  --shadow-border-hover:
+    0px 0px 0px 1px rgba(36, 27, 51, 0.1),
+    0px 1px 2px -1px rgba(36, 27, 51, 0.08),
+    0px 8px 16px -8px rgba(92, 61, 143, 0.18);
+  --shadow-lift:
+    0px 0px 0px 1px rgba(36, 27, 51, 0.06),
+    0px 24px 48px -24px rgba(36, 27, 51, 0.22);
+
+  --ease-smooth-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --motion-micro: 80ms;
+  --motion-quick: 150ms;
+  --motion-fast: 250ms;
+  --motion-slow: 400ms;
+  --tracking-display: -0.03em;
+  --leading-tight: 1.12;
+  --leading-snug: 1.25;
+  --leading-normal: 1.55;
+}
+
+@layer base {
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  html,
+  body,
+  #app {
+    min-height: 100%;
+  }
+
+  body {
+    background: var(--color-paper);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+  }
+
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
+
+  h1,
+  h2,
+  h3 {
+    text-wrap: balance;
+  }
+
+  p {
+    text-wrap: pretty;
+  }
+}
+
+/* Quiet grain so the paper does not read as a flat fill. */
+.paper-grain {
+  background-color: var(--color-paper);
+  background-image:
+    radial-gradient(ellipse 80% 50% at 10% -10%, color-mix(in oklab, var(--color-lilac) 35%, transparent), transparent 55%),
+    radial-gradient(ellipse 60% 40% at 100% 0%, color-mix(in oklab, var(--color-accent) 8%, transparent), transparent 50%);
+}
+
+.atelier-window {
+  box-shadow: var(--shadow-lift);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+    filter: blur(2px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    filter: blur(0);
+  }
+}
+
+.rise {
+  animation: rise-in var(--motion-slow) var(--ease-smooth-out) both;
+}
+.rise-2 { animation-delay: 40ms; }
+.rise-3 { animation-delay: 80ms; }
+.rise-4 { animation-delay: 120ms; }

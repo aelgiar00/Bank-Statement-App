@@ -1,0 +1,72 @@
+{
+  "CTk": {
+    "fg_color": ["#F3EDF7", "#F3EDF7"]
+  },
+  "CTkToplevel": {
+    "fg_color": ["#F3EDF7", "#F3EDF7"]
+  },
+  "CTkFrame": {
+    "corner_radius": 16,
+    "border_width": 0,
+    "fg_color": ["#FFFCFF", "#FFFCFF"],
+    "top_fg_color": ["#FBF7FE", "#FBF7FE"],
+    "border_color": ["#DDD1EA", "#DDD1EA"]
+  },
+  "CTkButton": {
+    "corner_radius": 12,
+    "border_width": 0,
+    "fg_color": ["#5C3D8F", "#5C3D8F"],
+    "hover_color": ["#4C3278", "#4C3278"],
+    "border_color": ["#5C3D8F", "#5C3D8F"],
+    "text_color": ["#FBF7FE", "#FBF7FE"],
+    "text_color_disabled": ["#C4B0E0", "#C4B0E0"]
+  },
+  "CTkLabel": {
+    "corner_radius": 0,
+    "fg_color": "transparent",
+    "text_color": ["#241B33", "#241B33"]
+  },
+  "CTkEntry": {
+    "corner_radius": 10,
+    "border_width": 1,
+    "fg_color": ["#FFFCFF", "#FFFCFF"],
+    "border_color": ["#C4B0E0", "#C4B0E0"],
+    "text_color": ["#241B33", "#241B33"],
+    "placeholder_text_color": ["#8A7D9A", "#8A7D9A"]
+  },
+  "CTkComboBox": {
+    "corner_radius": 10,
+    "border_width": 1,
+    "fg_color": ["#FFFCFF", "#FFFCFF"],
+    "border_color": ["#C4B0E0", "#C4B0E0"],
+    "button_color": ["#5C3D8F", "#5C3D8F"],
+    "button_hover_color": ["#4C3278", "#4C3278"],
+    "text_color": ["#241B33", "#241B33"],
+    "dropdown_fg_color": ["#FFFCFF", "#FFFCFF"],
+    "dropdown_hover_color": ["#E8DFEF", "#E8DFEF"],
+    "dropdown_text_color": ["#241B33", "#241B33"]
+  },
+  "CTkProgressBar": {
+    "corner_radius": 8,
+    "border_width": 0,
+    "fg_color": ["#DDD1EA", "#DDD1EA"],
+    "progress_color": ["#5C3D8F", "#5C3D8F"],
+    "border_color": ["#DDD1EA", "#DDD1EA"]
+  },
+  "CTkScrollableFrame": {
+    "corner_radius": 16,
+    "border_width": 0,
+    "fg_color": ["#FFFCFF", "#FFFCFF"],
+    "label_fg_color": ["#FBF7FE", "#FBF7FE"]
+  },
+  "CTkFont": {
+    "family": "Segoe UI",
+    "size": 13,
+    "weight": "normal"
+  },
+  "DropdownMenu": {
+    "fg_color": ["#FFFCFF", "#FFFCFF"],
+    "hover_color": ["#E8DFEF", "#E8DFEF"],
+    "text_color": ["#241B33", "#241B33"]
+  }
+}
