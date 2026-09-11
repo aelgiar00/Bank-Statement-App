@@ -130,9 +130,9 @@ export async function renderAlbilad({ doc, fonts, statement, onProgress }: Templ
     const currentPageRows = paginatedGroups[pageIndex] ?? [];
     
     // --- Print Metadata ---
-    const VALUE_X = 430; // زقيناها شمال سنة عشان تبعد عن العناوين وتبقى شكلها شيك
-    let currentTextY = 722; 
-    const LINE_SPACING = 14.5;    
+    const VALUE_X = 440; // زقة يمين سنة بسيطة
+    let currentTextY = 718; // زقة لتحت سنة بسيطة عشان تبعد عن الخط
+    const LINE_SPACING = 13.5; // تقليل المسافة سنة بسيطة عشان السطر الأخير يترفع عن الأحمر
     const FONT_SIZE = 9; 
 
     pen.text(safeShapeText(accountType), VALUE_X, currentTextY, FONT_SIZE, TEXT_COLOR, "right");
