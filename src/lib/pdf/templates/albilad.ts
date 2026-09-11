@@ -16,7 +16,7 @@ const TEXT_COLOR: Triplet = [0.08, 0.08, 0.08];
 // Text X-Coordinates for Table Data (Right-aligned)
 const TABLE_TEXT_X = {
   date: 545,     
-  details: 425,  // زقناها للشمال بزيادة عشان ماتخبطش في عمود التاريخ
+  details: 425,  
   debit: 243,        
   credit: 173,       
   balance: 103       
@@ -130,8 +130,8 @@ export async function renderAlbilad({ doc, fonts, statement, onProgress }: Templ
     const currentPageRows = paginatedGroups[pageIndex] ?? [];
     
     // --- Print Metadata ---
-    const VALUE_X = 475; // قربناها لليمين عشان تنزل جنب العناوين بالظبط
-    let currentTextY = 722; // رفعناها لفوق عشان ماتخبطش في الترويسة الحمراء
+    const VALUE_X = 430; // زقيناها شمال سنة عشان تبعد عن العناوين وتبقى شكلها شيك
+    let currentTextY = 722; 
     const LINE_SPACING = 14.5;    
     const FONT_SIZE = 9; 
 
@@ -186,7 +186,6 @@ export async function renderAlbilad({ doc, fonts, statement, onProgress }: Templ
 
       let currentDetailY = rowY;
       for (const line of detailLines) {
-        // قص حازم لأي سطر معدي الـ 45 حرف عشان ما يلمسش عمود التاريخ
         let safeLine = line.length > 45 ? line.substring(0, 42) + "..." : line;
         pen.text(safeShapeText(safeLine), TABLE_TEXT_X.details, currentDetailY, 8, TEXT_COLOR, "right");
         currentDetailY -= 10; 
