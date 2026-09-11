@@ -14,7 +14,7 @@ function clean(value: unknown): string {
     const d = String(value.getDate()).padStart(2, "0");
     return `${y}-${m}-${d}`;
   }
-  let s = String(value).trim();
+  const s = String(value).trim();
   if (!s || s.toLowerCase() === "nan" || s === "undefined") return "";
   // Excel serial date
   if (/^\d{5}(\.0+)?$/.test(s)) {
@@ -61,18 +61,23 @@ const HEADER_ALIASES: Array<{ field: Field; tests: RegExp[] }> = [
   { field: "amount", tests: [/المبلغ/, /amount/i, /قيمة/] },
 ];
 
-const META_LABELS: Array<{ key: keyof StatementMeta; tests: RegExp[] }> = [
+// 1. إضافة الكلمات الناقصة للـ META_LABELS
+// تأكد بس إن accountType و branch و period موجودين في ملف types.ts عندك
+const META_LABELS: Array<{ key: string; tests: RegExp[] }> = [
   { key: "reportDate", tests: [/تاريخ التقرير/, /report\s*date/i] },
   { key: "customer", tests: [/اسم العميل/, /customer/i, /client/i, /اسم صاحب/] },
   { key: "accountName", tests: [/اسم الحساب/, /account\s*name/i] },
   { key: "shortName", tests: [/الاسم المختصر/, /short\s*name/i] },
   { key: "accountNumber", tests: [/رقم الحساب/, /account\s*(no|number|#)/i] },
-  { key: "iban", tests: [/iban/i, /آيبان/, /ايبان/] },
+  { key: "accountType", tests: [/نوع الحساب/, /account\s*type/i] }, // جديد
+  { key: "branch", tests: [/الفرع/, /branch/i] }, // جديد
+  { key: "period", tests: [/الفترة/, /period/i] }, // جديد
+  { key: "iban", tests: [/iban/i, /آيبان/, /ايبان/, /الايبان/] }, // محسنة
   { key: "fromDate", tests: [/تاريخ من/, /from/, /من تاريخ/] },
   { key: "toDate", tests: [/تاريخ الى/, /تاريخ إلى/, /to date/i, /إلى تاريخ/] },
   { key: "accountBalance", tests: [/رصيد الحساب/, /account balance/i] },
-  { key: "openingBalance", tests: [/رصيد.*افتتاح/, /opening/i] },
-  { key: "closingBalance", tests: [/رصيد.*ختام/, /closing/i] },
+  { key: "openingBalance", tests: [/رصيد.*افتتاح/, /opening/i, /الرصيد الافتتاحي/] }, // محسنة
+  { key: "closingBalance", tests: [/رصيد.*ختام/, /closing/i, /رصيد الاغلاق/] }, // محسنة
   { key: "currency", tests: [/العملة/, /currency/i] },
 ];
 
@@ -123,25 +128,55 @@ function formatMoney(value: string | number, asBalance = false): string {
 }
 
 function extractMeta(rows: string[][], headerIndex: number): StatementMeta {
-  const meta = emptyMeta();
+  const meta: any = emptyMeta(); // Cast to any to support newly added keys
   const scan = rows.slice(0, headerIndex);
+  
   for (const row of scan) {
     const present = row
       .map((v, i) => [i, collapse(v)] as const)
       .filter(([, v]) => v);
+      
     for (let p = 0; p < present.length; p++) {
       const [i, label] = present[p]!;
+      
       for (const { key, tests } of META_LABELS) {
         if (meta[key]) continue;
-        if (!tests.some((r) => r.test(label))) continue;
-        const next = present[p + 1]?.[1];
-        const prev = present[p - 1]?.[1];
-        // Bank exports often put the VALUE to the left (RTL) of the label.
-        const candidate = prev && !META_LABELS.some((m) => m.tests.some((r) => r.test(prev)))
-          ? prev
-          : next;
-        if (candidate) meta[key] = candidate;
-        void i;
+        
+        // لو الخلية فيها الكلمة اللي بندور عليها
+        if (tests.some((r) => r.test(label))) {
+          
+          // 2. تحديث عبقري: لو القيمة لازقة في الكلمة في نفس الخلية (زي نوع الحساب: CA)
+          if (label.includes(":")) {
+            const parts = label.split(":");
+            const val1 = parts[0].trim();
+            const val2 = parts.length > 1 ? parts[1].trim() : "";
+            
+            // عشان الـ RTL، القيمة ممكن تكون قبل أو بعد النقطتين
+            const potentialValue = !tests.some(r => r.test(val2)) && val2 ? val2 : val1;
+            
+            if (potentialValue && !tests.some(r => r.test(potentialValue))) {
+               meta[key] = potentialValue;
+               continue;
+            }
+          }
+
+          // لو ملقاش القيمة في نفس الخلية، يدور في الخلايا اللي جنبها (زي الكود القديم)
+          const next = present[p + 1]?.[1];
+          const prev = present[p - 1]?.[1];
+          
+          let candidate = prev && !META_LABELS.some((m) => m.tests.some((r) => r.test(prev)))
+            ? prev
+            : next;
+            
+          // تأكيد إن الـ candidate مش مجرد Label تاني
+          if (candidate && META_LABELS.some(m => m.tests.some(r => r.test(candidate!)))) {
+              candidate = "";
+          }
+
+          if (candidate) {
+              meta[key] = candidate;
+          }
+        }
       }
     }
   }

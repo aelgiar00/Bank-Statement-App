@@ -20,6 +20,9 @@ export type StatementMeta = {
   customer: string;
   accountName: string;
   accountNumber: string;
+  accountType: string; // ضفنا نوع الحساب هنا
+  branch: string;      // ضفنا الفرع هنا
+  period: string;      // ضفنا الفترة هنا
   iban: string;
   fromDate: string;
   toDate: string;
@@ -62,6 +65,9 @@ export const emptyMeta = (): StatementMeta => ({
   customer: "",
   accountName: "",
   accountNumber: "",
+  accountType: "", // قيمة افتراضية لنوع الحساب
+  branch: "",      // قيمة افتراضية للفرع
+  period: "",      // قيمة افتراضية للفترة
   iban: "",
   fromDate: "",
   toDate: "",
