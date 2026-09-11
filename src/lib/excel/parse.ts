@@ -16,7 +16,6 @@ function clean(value: unknown): string {
   }
   const s = String(value).trim();
   if (!s || s.toLowerCase() === "nan" || s === "undefined") return "";
-  // Excel serial date
   if (/^\d{5}(\.0+)?$/.test(s)) {
     const n = Number(s);
     if (n > 20000 && n < 80000) {
@@ -35,9 +34,11 @@ function collapse(s: string) {
   return s.replace(/\s+/g, " ").trim();
 }
 
+// ضفنا الـ description كحقل منفصل عشان مايتعملوش Override
 type Field =
   | "date"
   | "details"
+  | "description"
   | "debit"
   | "credit"
   | "balance"
@@ -48,10 +49,9 @@ type Field =
 
 const HEADER_ALIASES: Array<{ field: Field; tests: RegExp[] }> = [
   { field: "date", tests: [/تاريخ/, /date/i, /value\s*date/i, /txn/i] },
-  {
-    field: "details",
-    tests: [/تفاصيل/, /الوصف/, /وصف/, /details?/i, /desc/i, /narration/i],
-  },
+  { field: "details", tests: [/تفاصيل/, /details?/i, /narration/i] },
+  // فصلنا الوصف في سطر لوحده
+  { field: "description", tests: [/الوصف/, /وصف/, /desc/i, /description/i, /memo/i] },
   { field: "debit", tests: [/مدين/, /خصم/, /سحب/, /debit/i, /withdraw/i] },
   { field: "credit", tests: [/دائن/, /إيداع/, /ايداع/, /credit/i, /deposit/i] },
   { field: "balance", tests: [/رصيد/, /balance/i] },
@@ -61,23 +61,21 @@ const HEADER_ALIASES: Array<{ field: Field; tests: RegExp[] }> = [
   { field: "amount", tests: [/المبلغ/, /amount/i, /قيمة/] },
 ];
 
-// 1. إضافة الكلمات الناقصة للـ META_LABELS
-// تأكد بس إن accountType و branch و period موجودين في ملف types.ts عندك
 const META_LABELS: Array<{ key: string; tests: RegExp[] }> = [
   { key: "reportDate", tests: [/تاريخ التقرير/, /report\s*date/i] },
   { key: "customer", tests: [/اسم العميل/, /customer/i, /client/i, /اسم صاحب/] },
   { key: "accountName", tests: [/اسم الحساب/, /account\s*name/i] },
   { key: "shortName", tests: [/الاسم المختصر/, /short\s*name/i] },
   { key: "accountNumber", tests: [/رقم الحساب/, /account\s*(no|number|#)/i] },
-  { key: "accountType", tests: [/نوع الحساب/, /account\s*type/i] }, // جديد
-  { key: "branch", tests: [/الفرع/, /branch/i] }, // جديد
-  { key: "period", tests: [/الفترة/, /period/i] }, // جديد
-  { key: "iban", tests: [/iban/i, /آيبان/, /ايبان/, /الايبان/] }, // محسنة
+  { key: "accountType", tests: [/نوع الحساب/, /account\s*type/i] }, 
+  { key: "branch", tests: [/الفرع/, /branch/i] }, 
+  { key: "period", tests: [/الفترة/, /period/i] }, 
+  { key: "iban", tests: [/iban/i, /آيبان/, /ايبان/, /الايبان/] }, 
   { key: "fromDate", tests: [/تاريخ من/, /from/, /من تاريخ/] },
   { key: "toDate", tests: [/تاريخ الى/, /تاريخ إلى/, /to date/i, /إلى تاريخ/] },
   { key: "accountBalance", tests: [/رصيد الحساب/, /account balance/i] },
-  { key: "openingBalance", tests: [/رصيد.*افتتاح/, /opening/i, /الرصيد الافتتاحي/] }, // محسنة
-  { key: "closingBalance", tests: [/رصيد.*ختام/, /closing/i, /رصيد الاغلاق/] }, // محسنة
+  { key: "openingBalance", tests: [/رصيد.*افتتاح/, /opening/i, /الرصيد الافتتاحي/] }, 
+  { key: "closingBalance", tests: [/رصيد.*ختام/, /closing/i, /رصيد الاغلاق/] }, 
   { key: "currency", tests: [/العملة/, /currency/i] },
 ];
 
@@ -128,7 +126,7 @@ function formatMoney(value: string | number, asBalance = false): string {
 }
 
 function extractMeta(rows: string[][], headerIndex: number): StatementMeta {
-  const meta: any = emptyMeta(); // Cast to any to support newly added keys
+  const meta: any = emptyMeta();
   const scan = rows.slice(0, headerIndex);
   
   for (const row of scan) {
@@ -142,25 +140,19 @@ function extractMeta(rows: string[][], headerIndex: number): StatementMeta {
       for (const { key, tests } of META_LABELS) {
         if (meta[key]) continue;
         
-        // لو الخلية فيها الكلمة اللي بندور عليها
         if (tests.some((r) => r.test(label))) {
-          
-          // 2. تحديث عبقري: لو القيمة لازقة في الكلمة في نفس الخلية (زي نوع الحساب: CA)
-          if (label.includes(":")) {
-            const parts = label.split(":");
-            const val1 = parts[0].trim();
-            const val2 = parts.length > 1 ? parts[1].trim() : "";
-            
-            // عشان الـ RTL، القيمة ممكن تكون قبل أو بعد النقطتين
-            const potentialValue = !tests.some(r => r.test(val2)) && val2 ? val2 : val1;
-            
-            if (potentialValue && !tests.some(r => r.test(potentialValue))) {
-               meta[key] = potentialValue;
-               continue;
-            }
+          // لوجيك تنظيف الخلايا الملزوقة (زي CAنوع الحساب)
+          let inlineValue = label;
+          for (const r of tests) {
+             inlineValue = inlineValue.replace(new RegExp(r.source, 'gi'), '');
+          }
+          inlineValue = inlineValue.replace(/الحساب|نوع|:/g, '').trim();
+
+          if (inlineValue && !META_LABELS.some(m => m.tests.some(r => r.test(inlineValue)))) {
+            meta[key] = inlineValue;
+            continue;
           }
 
-          // لو ملقاش القيمة في نفس الخلية، يدور في الخلايا اللي جنبها (زي الكود القديم)
           const next = present[p + 1]?.[1];
           const prev = present[p - 1]?.[1];
           
@@ -168,7 +160,6 @@ function extractMeta(rows: string[][], headerIndex: number): StatementMeta {
             ? prev
             : next;
             
-          // تأكيد إن الـ candidate مش مجرد Label تاني
           if (candidate && META_LABELS.some(m => m.tests.some(r => r.test(candidate!)))) {
               candidate = "";
           }
@@ -183,12 +174,11 @@ function extractMeta(rows: string[][], headerIndex: number): StatementMeta {
   return meta;
 }
 
-function isJunkRow(tx: Transaction): boolean {
+function isJunkRow(tx: any): boolean {
   const filled = [tx.date, tx.details, tx.debit, tx.credit, tx.balance].filter(Boolean);
   if (filled.length === 0) return true;
   if (tx.date === "تاريخ" || tx.date === "Date") return true;
-  // Legal footer: long prose, no date, no amounts.
-  if (!tx.date && !tx.debit && !tx.credit && !tx.balance && tx.details.length > 80) return true;
+  if (!tx.date && !tx.debit && !tx.credit && !tx.balance && (tx.details || "").length > 80) return true;
   return false;
 }
 
@@ -229,36 +219,26 @@ export function parseStatement(data: ArrayBuffer, filename: string): Statement {
 
   let headerIndex = matrix.findIndex(looksLikeHeader);
   if (headerIndex < 0) {
-    // Fallback: first row that has 4+ non-empty cells
     headerIndex = matrix.findIndex((r) => r.filter(Boolean).length >= 4);
   }
   if (headerIndex < 0) {
-    throw new Error(
-      "Could not find a transaction header row. Expected columns such as Date, Details, Debit, Credit, Balance.",
-    );
+    throw new Error("Could not find a transaction header row.");
   }
 
   const header = matrix[headerIndex]!;
   const col = mapHeaders(header);
-  if (col.date === undefined && col.details === undefined) {
-    throw new Error(
-      "The header row is missing date/details columns. Please export the statement again from the bank portal.",
-    );
-  }
 
   const meta = extractMeta(matrix, headerIndex);
-  const rows: Transaction[] = [];
+  const rows: any[] = []; // استخدمنا any عشان نقبل حقل description
 
   for (let r = headerIndex + 1; r < matrix.length; r++) {
     const line = matrix[r] ?? [];
-    const pick = (field: Field) =>
-      col[field] !== undefined ? clean(line[col[field]!]) : "";
+    const pick = (field: Field) => col[field] !== undefined ? clean(line[col[field]!]) : "";
 
-    const tx: Transaction = {
+    const tx: any = {
       date: pick("date"),
-      details: [pick("details"), pick("type") === pick("details") ? "" : ""]
-        .filter(Boolean)
-        .join(" "),
+      details: pick("details"),
+      description: pick("description"), // سحبنا الوصف هنا!
       debit: pick("debit"),
       credit: pick("credit"),
       balance: pick("balance"),
@@ -267,18 +247,12 @@ export function parseStatement(data: ArrayBuffer, filename: string): Statement {
       ref: pick("ref"),
     };
 
-    // Alinma-style signed amount column
     if (!tx.debit && !tx.credit && col.amount !== undefined) {
       const parsed = parseAmount(pick("amount"));
       if (typeof parsed === "number") {
         if (parsed < 0) tx.debit = formatMoney(Math.abs(parsed));
         else if (parsed > 0) tx.credit = formatMoney(parsed);
       }
-    }
-
-    if (!tx.details) {
-      const extras = line.filter((c, i) => c && i !== col.date && i !== col.debit && i !== col.credit && i !== col.balance);
-      tx.details = extras.slice(0, 2).join(" — ");
     }
 
     if (isJunkRow(tx)) continue;
