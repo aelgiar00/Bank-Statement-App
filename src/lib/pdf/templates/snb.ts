@@ -4,15 +4,16 @@ import { yieldPaint, type TemplateArgs } from "./shared";
 import { shapeArabic } from "../arabic";
 import { PDFDocument } from "pdf-lib";
 
-const PORTAL_LIGHT: Triplet = [0.87, 0.92, 0.89];
+// الألوان اتظبطت على الشعرة زي الصورة بالظبط
+const PORTAL_LIGHT: Triplet = [0.85, 0.90, 0.88]; // خلفية الأعمدة التركواز الفاتح
 const RED: Triplet = [0.72, 0.10, 0.10];
-const GREEN_TEXT: Triplet = [0.05, 0.50, 0.16];
-const GREEN: Triplet = [0.043, 0.42, 0.227];
+const GREEN_TEXT: Triplet = [0.0, 0.43, 0.32]; // النص التركواز
+const GREEN: Triplet = [0.0, 0.43, 0.32]; // اللون التركواز الأساسي للبنك (الهيدر وخطوط الجدول)
 const DEEP: Triplet = [0.02, 0.18, 0.1];
-const WASH: Triplet = [0.95, 0.96, 0.95]; // درجة أغمق سنة عشان الـ Shadow يبان أحلى
+const WASH: Triplet = [0.92, 0.92, 0.92]; // الجراي الواضح بتاع الزيبرا
 const WHITE: Triplet = [1, 1, 1];
 const INK: Triplet = [0.08, 0.08, 0.08];
-const GRID: Triplet = [0.78, 0.83, 0.80];
+const GRID: Triplet = [0.90, 0.92, 0.90]; // خطوط عادية للورقة من فوق
 
 const safeShape = (txt: any) => {
   if (!txt || String(txt).trim() === "" || String(txt).toLowerCase() === "nan") return "—";
@@ -48,7 +49,6 @@ const safeAccount = (val: any) => {
   return s.replace(/\.0+$/, "").replace(/,/g, "");
 };
 
-// 🎯 استشعار ذكي للقالب
 function detectIsPortal(m: any): boolean {
   if (String((m as any).templateType) === "2") return true;
   if (String((m as any).templateType) === "1") return false;
@@ -121,9 +121,6 @@ export async function renderSnb({ doc, fonts, statement, onProgress }: TemplateA
     const isFirst = p === 0;
     const pageRows = pages[p] || [];
 
-    // =====================================================
-    // ☢️ الإبادة الذكية الدقيقة
-    // =====================================================
     if (templateDoc) {
       if (isPortal) {
         if (isFirst) {
@@ -146,9 +143,6 @@ export async function renderSnb({ doc, fonts, statement, onProgress }: TemplateA
       pen.rect(PAGE_W - 155, 5, 150, 30, WHITE);
     }
 
-    // =====================================================
-    // 🏗️ بناء الداتا في القالب الأونلاين (2)
-    // =====================================================
     if (isPortal) {
       const rowH = 22;
       let y = 0;
@@ -173,7 +167,6 @@ export async function renderSnb({ doc, fonts, statement, onProgress }: TemplateA
         const dateStr = (m.fromDate && m.toDate) ? `${m.fromDate} - ${m.toDate}` : (m.toDate || m.fromDate || "—");
         pen.text(safeShape(dateStr), 420, infoY, 8.5, INK, "right");
 
-        // --- المرشحات ---
         const fTop = infoY - 48; 
         pen.text(shapeArabic("المرشحات"), 820, fTop, 9, INK, "right");
         pen.line(15, fTop - 8, 820, fTop - 8, GRID, 0.5); 
@@ -207,41 +200,39 @@ export async function renderSnb({ doc, fonts, statement, onProgress }: TemplateA
         pen.text(shapeArabic("دائن/مدين:"), 480, fTop - 20 - fStep * 3, 7.5, INK, "center");
         pen.text(shapeArabic("الكل"), 350, fTop - 20 - fStep * 3, 7.5, INK, "right");
 
-        // نزلنا بالـ Y شوية عشان نوسع مكان للبار الأخضر الغامق الجديد
-        y = fTop - 20 - (fStep * 4) - 35;
+        y = fTop - 20 - (fStep * 4) - 25;
       } else {
-        y = PAGE_H - 60;
+        y = PAGE_H - 50;
       }
 
-      // --- التعديل السحري للألوان والهيدر هنا ---
+      // 1. البار التركواز الغامق فوق الجدول
+      pen.rect(15, y, PAGE_W - 30, rowH, GREEN);
+      pen.text(shapeArabic("تفاصيل نتائج البحث"), 815, y + 6, 8.5, WHITE, "right");
       
-      // 1. البار الأخضر الغامق فوق الجدول
-      const darkBarY = y + rowH;
-      pen.rect(15, darkBarY, PAGE_W - 30, rowH, GREEN);
-      pen.text(shapeArabic("تفاصيل نتائج البحث"), 815, darkBarY + 6, 8.5, WHITE, "right");
+      y -= rowH;
 
-      // 2. هيدر الأعمدة الأخضر الفاتح والكلام فيه أخضر غامق
+      // 2. هيدر الأعمدة: خلفية فاتحة وكلام تركواز
       pen.rect(15, y, PAGE_W - 30, rowH, PORTAL_LIGHT);
       for (const col of portalCols) {
         const cx = col.x0 + (col.x1 - col.x0) / 2;
-        pen.text(shapeArabic(col.t), cx, y + 6, 7.5, GREEN, "center"); // الكلام أخضر زي البنك
+        pen.text(shapeArabic(col.t), cx, y + 6, 7.5, GREEN, "center");
       }
 
       const xs = [15, 80, 160, 240, 300, 380, 480, 750, 820];
       
-      // 3. فواصل بيضاء بين أسماء الأعمدة بس
+      // 3. فواصل بيضاء بين أسماء الأعمدة 
       for (const x of xs) {
         if (x !== 15 && x !== 820) {
           pen.line(x, y, x, y + rowH, WHITE, 1.2);
         }
       }
 
-      const rowsStartY = y; // عشان نوقف خطوط الجدول لحد هنا ومتبوظش الهيدر
+      const rowsStartY = y;
 
       pageRows.forEach((row, idx) => {
         y -= rowH;
-        // 4. الظل الرمادي المضبوط (Zebra Shadow)
-        pen.rect(15, y, PAGE_W - 30, rowH, idx % 2 === 0 ? WHITE : WASH);
+        // 4. الزيبرا: أول سطر يبدأ بالجراي (WASH) زي ما طلبت بالظبط
+        pen.rect(15, y, PAGE_W - 30, rowH, idx % 2 === 0 ? WASH : WHITE);
 
         pen.text(row.date ? String(row.date).slice(0, 10) : "—", portalCols[0].x0 + 35, y + 6, 7.5, INK, "center");
 
@@ -273,19 +264,18 @@ export async function renderSnb({ doc, fonts, statement, onProgress }: TemplateA
 
         pen.text(safeMoney(row.balance), portalCols[7].x0 + 32, y + 6, 7.5, INK, "center");
 
-        pen.line(15, y, 820, y, GRID, 0.4);
+        // خط أفقي تركواز بين كل صفحة والتانية
+        pen.line(15, y, 820, y, GREEN, 0.4);
       });
 
-      // 5. تقفيل الجدول بالخطوط الرمادية في منطقة البيانات بس (عشان متبوظش شكل الهيدر الأخضر)
-      pen.line(15, y, 820, y, GRID, 1.0);
+      // 5. تقفيل الجدول بخطوط تركواز رأسية وأفقية زي الصورة بالظبط
+      pen.line(15, y, 820, y, GREEN, 1.0);
       for (const x of xs) {
-        pen.line(x, y, x, rowsStartY, GRID, 0.6);
+        pen.line(x, y, x, rowsStartY, GREEN, 0.5);
       }
     } 
-    // =====================================================
-    // 🏗️ بناء الداتا في قالب الفروع (1)
-    // =====================================================
     else {
+      // (كود الفروع)
       if (isFirst) {
         const customerName = safeShape(m.customer || m.accountName);
         const accNumber = safeShape(m.accountNumber);
@@ -355,7 +345,6 @@ export async function renderSnb({ doc, fonts, statement, onProgress }: TemplateA
       }
     }
 
-    // 📄 ترقيم الصفحات في الأطراف
     pen.text(shapeArabic(`Page ${p + 1} of ${totalPages}`), 30, 20, 8, INK, "left");
     pen.text(shapeArabic(`${totalPages} من ${p + 1} الصفحة`), PAGE_W - 30, 20, 8, INK, "right");
 
