@@ -1,5 +1,5 @@
 /**
- * Albilad Bank Statement PDF Generator (Multiline Details & Summary Wipe Fix)
+ * Albilad Bank Statement PDF Generator (Final Layout & Multiline Fixes)
  * 
  * @module renderAlbilad
  */
@@ -73,12 +73,12 @@ export async function renderAlbilad({ doc, fonts, statement, onProgress }: Templ
     if (!isNaN(debit)) totalWithdrawals += Math.abs(debit);
   }
 
-  // 3. Chunk rows into pages (Reduced to 9 to allow up to 3 lines per row safely)
-  const MAX_ROWS_PER_PAGE = 9;
+  // 3. Chunk rows into pages (13 rows perfectly fills the Albilad table layout)
+  const MAX_ROWS_PER_PAGE = 13;
   const paginatedGroups = chunk(validRows, MAX_ROWS_PER_PAGE);
   const totalPages = Math.max(paginatedGroups.length, 1);
 
-  // 4. Load & EMBED Templates (Lightweight)
+  // 4. Load & EMBED Templates
   let embeddedFirstPage: any;
   let embeddedLastPage: any;
   try {
@@ -97,7 +97,11 @@ export async function renderAlbilad({ doc, fonts, statement, onProgress }: Templ
 
   // 5. Extract and Clean Metadata
   const meta = (statement.meta as any) || {};
-  const accountType = cleanMetadata(meta.accountType);
+  
+  // Fix Account Type (Extracts "CA" from "CAنوع الحساب" or defaults to "حساب جاري")
+  const rawAccType = cleanMetadata(meta.accountType, /نوع|الحساب|:/g);
+  const accountType = rawAccType !== "-" && rawAccType !== "" ? rawAccType : "حساب جاري";
+  
   const accountNumber = cleanMetadata(meta.accountNumber, /الفترة|الفرع|رقم|:/);
   const ibanNumber = cleanMetadata(meta.iban, /الفرع|رقم|:/);
   const branchName = cleanMetadata(meta.branch, /العملة|رقم/);
@@ -155,8 +159,9 @@ export async function renderAlbilad({ doc, fonts, statement, onProgress }: Templ
 
     pen.text(safeShapeText(openingBalance), VALUE_X, currentTextY, FONT_SIZE, TEXT_COLOR, "right");
 
-    // --- Print Table Rows (With Multiline Details) ---
+    // --- Print Table Rows ---
     const ROW_START_Y = 555; 
+    const FIXED_ROW_STEP = 33; // مسافة ثابتة بين كل عملية والتانية عشان تملى الجدول بانتظام
     let rowY = ROW_START_Y;
     
     for (const row of currentPageRows) {
@@ -165,51 +170,46 @@ export async function renderAlbilad({ doc, fonts, statement, onProgress }: Templ
       const creditVal = extractStr(row.credit);
       const balanceVal = extractStr(row.balance);
       
-      // تجهيز سطور تفاصيل العملية المتعددة
+      // صيد تفاصيل العملية (بندور في كل الـ Keys اللي ممكن المابر يبعتها)
       const rDetails = extractStr(row.details);
-      const rDesc = extractStr((row as any).description);
-      const rRef = extractStr((row as any).reference || (row as any).ref);
+      const rDesc = extractStr((row as any).description || (row as any).desc || (row as any).memo || "");
+      const rRef = extractStr((row as any).reference || (row as any).ref || "");
       
       const detailLines: string[] = [];
       if (rDetails) detailLines.push(rDetails);
       if (rDesc) detailLines.push(rDesc);
       if (rRef) detailLines.push(rRef);
 
-      // طباعة الداتا الثابتة على نفس خط الـ Y
+      // طباعة الداتا الثابتة (تاريخ، مدين، دائن، رصيد)
       pen.text(safeShapeText(dateVal), TABLE_TEXT_X.date, rowY, 9, TEXT_COLOR, "right");
       pen.text(safeShapeText(debitVal), TABLE_TEXT_X.debit, rowY, 9, TEXT_COLOR, "right");
       pen.text(safeShapeText(creditVal), TABLE_TEXT_X.credit, rowY, 9, TEXT_COLOR, "right");
       pen.text(safeShapeText(balanceVal), TABLE_TEXT_X.balance, rowY, 9, TEXT_COLOR, "right");
 
-      // طباعة تفاصيل العملية (سطر تحت سطر)
+      // طباعة سطور الوصف تحت بعضها
       let currentDetailY = rowY;
       for (const line of detailLines) {
-        // لو السطر طويل جداً نقص منه عشان ما يخشش في الأرقام
         let safeLine = line.length > 55 ? line.substring(0, 52) + "..." : line;
         pen.text(safeShapeText(safeLine), TABLE_TEXT_X.details, currentDetailY, 8, TEXT_COLOR, "right");
-        currentDetailY -= 12; // ننزل 12 بيكسل للسطر اللي بعده جوه نفس الخلية
+        currentDetailY -= 11; // مسافة صغيرة بين السطور جوه نفس العملية
       }
       
-      // ننزل للعملية اللي بعدها بمسافة ديناميكية على حسب عدد السطور
-      const rowStep = Math.max(30, detailLines.length * 12 + 10);
-      rowY -= rowStep;
+      // ننزل للعملية اللي بعدها
+      rowY -= FIXED_ROW_STEP;
     }
     
     // --- Print Summary (Only on Last Page) ---
     if (isLastPage) {
-      // 1. مسح الأرقام القديمة بمربعات بيضاء دقيقة عشان مانمسحش الخطوط بالطول
+      // مربعات بيضاء دقيقة لمسح الأرقام القديمة
       const WIPE_Y = 112;
       const WIPE_HEIGHT = 20;
       
-      // مربع مسح الرصيد
       page.drawRectangle({ x: 45, y: WIPE_Y, width: 60, height: WIPE_HEIGHT, color: rgb(1, 1, 1) });
-      // مربع مسح الإيداعات
       page.drawRectangle({ x: 115, y: WIPE_Y, width: 60, height: WIPE_HEIGHT, color: rgb(1, 1, 1) });
-      // مربع مسح السحوبات
       page.drawRectangle({ x: 185, y: WIPE_Y, width: 60, height: WIPE_HEIGHT, color: rgb(1, 1, 1) });
 
-      // 2. طباعة المجاميع الجديدة فوق المربعات البيضاء
-      const SUMMARY_Y = 120; // متظبطة بالمللي مكان الأرقام القديمة
+      // طباعة المجاميع الجديدة
+      const SUMMARY_Y = 120;
       const formatNum = (n: number) => n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
       
       pen.text(safeShapeText(formatNum(totalDeposits)), TABLE_TEXT_X.credit, SUMMARY_Y, 9, TEXT_COLOR, "right");
