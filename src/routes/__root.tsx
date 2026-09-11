@@ -17,12 +17,12 @@ function RootComponent() {
   useEffect(() => {
     let isMounted = true;
 
-    // تفعيل تايم أوت طوارئ (لو سوبابيس اتأخر، فك التعليقة فوراً خلال ثانية)
+    // زودت التايم أوت شوية عشان يدي فرصة للنت البطيء
     const timer = setTimeout(() => {
-      if (isMounted && loading) {
+      if (isMounted) {
         setLoading(false);
       }
-    }, 1000);
+    }, 3000);
 
     supabase.auth.getSession()
       .then(({ data: { session }, error }) => {
@@ -66,27 +66,19 @@ function RootComponent() {
     }
   };
 
-  if (loading) {
-    return (
-      <html lang="en" className="antialiased" suppressHydrationWarning>
-        <head>
-          <HeadContent />
-        </head>
-        <body style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', background: '#f8fafc', margin: 0 }}>
+  // دالة منفصلة عشان نرندر المحتوى بس، ونحافظ على الـ Scripts بره
+  const renderContent = () => {
+    if (loading) {
+      return (
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', background: '#f8fafc', margin: 0 }}>
           <h2 style={{ fontFamily: 'sans-serif', color: '#334155' }}>جاري تحميل النظام...</h2>
-        </body>
-      </html>
-    );
-  }
+        </div>
+      );
+    }
 
-  // لو مفيش سيشن، اعرض شاشة الـ Login فقط
-  if (!session) {
-    return (
-      <html lang="en" className="antialiased" suppressHydrationWarning>
-        <head>
-          <HeadContent />
-        </head>
-        <body style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', background: '#0f172a', margin: 0, fontFamily: 'sans-serif' }}>
+    if (!session) {
+      return (
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', background: '#0f172a', margin: 0, fontFamily: 'sans-serif' }}>
           <form onSubmit={handleLogin} style={{ background: '#1e293b', padding: '40px', borderRadius: '12px', boxShadow: '0 10px 25px rgba(0,0,0,0.3)', width: '350px', textAlign: 'right' }} dir="rtl">
             <h2 style={{ color: '#fff', marginBottom: '20px', textAlign: 'center', fontSize: '22px' }}>تسجيل دخول Keshf</h2>
             
@@ -122,18 +114,12 @@ function RootComponent() {
               دخول
             </button>
           </form>
-        </body>
-      </html>
-    );
-  }
+        </div>
+      );
+    }
 
-  // لو فيه سيشن، افتح التطبيق بكل ميزاته مع الـ AuthProvider والـ Outlet
-  return (
-    <html lang="en" className="antialiased" suppressHydrationWarning>
-      <head>
-        <HeadContent />
-      </head>
-      <body>
+    return (
+      <>
         <div style={{ position: 'absolute', top: '10px', left: '10px', zIndex: 9999 }}>
           <button 
             onClick={() => supabase.auth.signOut()} 
@@ -146,6 +132,18 @@ function RootComponent() {
         <AuthProvider>
           <Outlet />
         </AuthProvider>
+      </>
+    );
+  };
+
+  // الهيكل الأساسي اللي عمره ما هيخفي الـ Scripts
+  return (
+    <html lang="en" className="antialiased" suppressHydrationWarning>
+      <head>
+        <HeadContent />
+      </head>
+      <body>
+        {renderContent()}
         <Scripts />
       </body>
     </html>
