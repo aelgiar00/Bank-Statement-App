@@ -19,14 +19,12 @@
       "vite/client",
       "node"
     ],
-    "baseUrl": ".",
     "paths": {
       "@/*": [
         "./src/*"
       ]
     },
-    "allowImportingTsExtensions": true,
-    "ignoreDeprecations": "5.0"
+    "allowImportingTsExtensions": true
   },
   "include": [
     "src",
