@@ -1,5 +1,5 @@
 /**
- * SNB Bank Statement PDF Generator (Pixel-Perfect Template Integration)
+ * SNB Bank Statement PDF Generator (Pixel-Perfect with Pre-wiped Templates)
  * 
  * @module renderSnb
  */
@@ -12,18 +12,18 @@ import { PDFDocument, rgb } from "pdf-lib";
 const PAGE_WIDTH = 842;  // SNB Landscape
 const PAGE_HEIGHT = 595;
 const TEXT_COLOR: Triplet = [0.08, 0.08, 0.08];
-const RED: Triplet = [0.72, 0.10, 0.10]; // لون المدين
+const RED: Triplet = [0.72, 0.10, 0.10]; // لون المدين الأحمر
 
-// إحداثيات الأعمدة (متوسطة بالمللي على القالب الأصلي)
+// إحداثيات الأعمدة (متوسطة بالمللي عشان تنزل جوه الجداول)
 const TABLE_TEXT_X = {
-  date: 785,     // التاريخ (منتصف)
-  details: 735,  // التفاصيل (يمين عشان الكلام ياخد راحته للشمال)
-  notes: 430,    // ملاحظات (منتصف)
-  ref: 340,      // المرجع (منتصف)
-  type: 270,     // رمز العملية (منتصف)
-  credit: 195,   // دائن (منتصف)
-  debit: 120,    // مدين (منتصف)
-  balance: 50    // الرصيد (منتصف)
+  date: 785,     
+  details: 745,  // زقيناها يمين عشان تفرد براحتها للشمال جوه الخانة بس
+  notes: 435,    
+  ref: 345,      
+  type: 275,     
+  credit: 195,   
+  debit: 115,    
+  balance: 45    
 };
 
 // --- Utility Functions ---
@@ -43,7 +43,7 @@ const extractStr = (val: any) => {
   return str;
 };
 
-// دالة لقص النصوص الطويلة عشان ماتدخلش في العواميد التانية
+// دالة القص الصارمة: مستحيل النص يخرج بره خانة التفاصيل
 function splitText(text: string, maxLen: number): string[] {
   if (!text) return [];
   const words = text.split(" ");
@@ -67,7 +67,7 @@ export async function renderSnb({ doc, fonts, statement, onProgress }: TemplateA
   const validRows = statement.rows.filter((row) => {
     const dateStr = String(row.date || "");
     const detailsStr = String(row.details || "");
-    return !(dateStr.includes("ميلادي") || detailsStr.includes("التفاصيل") || dateStr.includes("التاريخ"));
+    return !(dateStr.includes("ميلادي") || detailsStr.includes("التفاصيل") || dateStr.includes("التاريخ") || dateStr.includes("الرصيد"));
   });
 
   // 2. Calculations for the final summary page
@@ -89,9 +89,9 @@ export async function renderSnb({ doc, fonts, statement, onProgress }: TemplateA
     }
   }
 
-  // 3. Chunk rows into pages
-  const ROWS_FIRST_PAGE = 11; // عشان الميتا داتا واخدة مساحة
-  const ROWS_MIDDLE_PAGE = 22; // الجدول كامل
+  // 3. Chunk rows into pages (تظبيط العدد عشان مايخرجش بره الجدول)
+  const ROWS_FIRST_PAGE = 10; 
+  const ROWS_MIDDLE_PAGE = 20; 
   
   const paginatedGroups: any[][] = [];
   if (validRows.length > 0) {
@@ -125,7 +125,7 @@ export async function renderSnb({ doc, fonts, statement, onProgress }: TemplateA
     embeddedLastPage = lastPageForm;
   } catch (error) {
     console.error("⚠️ Failed to load SNB templates", error);
-    throw new Error("تأكد من رفع القوالب: snb_first_page.pdf, snb_middle_page.pdf, snb_last_page.pdf");
+    throw new Error("ملفات القوالب غير موجودة في public/templates");
   }
 
   const meta = (statement.meta as any) || {};
@@ -148,32 +148,29 @@ export async function renderSnb({ doc, fonts, statement, onProgress }: TemplateA
     const currentPageRows = paginatedGroups[pageIndex] ?? [];
     
     // --- طباعة الميتا داتا (الصفحة الأولى فقط) ---
+    // (شيلنا العناوين وطبعنا الداتا بس في أماكنها)
     if (isFirstPage) {
-      // الأسماء فوق
-      pen.text(safeShapeText(meta.customer || meta.accountName || ""), 730, 480, 8.5, TEXT_COLOR, "right");
-      pen.text(safeShapeText(meta.username || meta.shortName || "demo"), 730, 465, 8.5, TEXT_COLOR, "right");
+      const VAL_R_X = 730; 
+      const VAL_L_X = 350; 
       
-      // التاريخ والوقت
-      pen.text(safeShapeText(meta.reportDate || ""), 420, 510, 8.5, TEXT_COLOR, "center");
+      pen.text(safeShapeText(meta.customer || meta.accountName || ""), VAL_R_X, 475, 8.5, TEXT_COLOR, "right");
+      pen.text(safeShapeText(meta.username || meta.shortName || "demo"), VAL_R_X, 460, 8.5, TEXT_COLOR, "right");
       
-      // المرشحات اليمين
-      pen.text(shapeArabic("تنازلي"), 730, 400, 8, TEXT_COLOR, "right");
-      pen.text(safeShapeText(meta.toDate || ""), 730, 385, 8, TEXT_COLOR, "right");
-      pen.text(safeShapeText(meta.accountNumber || ""), 730, 370, 8, TEXT_COLOR, "right");
-      pen.text(shapeArabic("الحالي"), 730, 355, 8, TEXT_COLOR, "right");
-      pen.text(shapeArabic("الكل"), 730, 340, 8, TEXT_COLOR, "right");
+      const dateStr = (meta.fromDate && meta.toDate) ? `${meta.fromDate} - ${meta.toDate}` : (meta.reportDate || "-");
+      pen.text(safeShapeText(dateStr), 420, 485, 8.5, TEXT_COLOR, "center");
+      
+      // المرشحات اليمين (مظبوطة بالمللي)
+      pen.text(safeShapeText(meta.toDate || ""), VAL_R_X, 396, 8, TEXT_COLOR, "right");
+      pen.text(safeShapeText(meta.accountNumber || ""), VAL_R_X, 381, 8, TEXT_COLOR, "right");
 
-      // المرشحات الشمال
-      pen.text("500", 350, 400, 8, TEXT_COLOR, "right");
-      pen.text(safeShapeText(meta.fromDate || ""), 350, 385, 8, TEXT_COLOR, "right");
-      pen.text(shapeArabic("الحالي"), 350, 370, 8, TEXT_COLOR, "right");
-      pen.text(shapeArabic("الكل"), 350, 355, 8, TEXT_COLOR, "right");
+      // المرشحات الشمال (مظبوطة بالمللي)
+      pen.text(safeShapeText(meta.fromDate || ""), VAL_L_X, 396, 8, TEXT_COLOR, "right");
     }
 
     // --- طباعة صفوف الجدول ---
-    // إحداثيات البداية متقاسة عشان تنزل على أول سطر جراي/أبيض بالظبط
-    const ROW_START_Y = isFirstPage ? 290 : 500; 
-    const FIXED_ROW_STEP = 20; // المسافة المثالية لسطور SNB
+    // رفعنا بداية الجدول عشان يظبط مع أول سطر رمادي/أبيض
+    const ROW_START_Y = isFirstPage ? 290 : 515; 
+    const FIXED_ROW_STEP = 22; // المسافة الدقيقة بين السطور في SNB
     let rowY = ROW_START_Y;
     
     for (const row of currentPageRows) {
@@ -189,7 +186,6 @@ export async function renderSnb({ doc, fonts, statement, onProgress }: TemplateA
       const rRef = extractStr(rawRow.ref || rawRow.reference || rawRow['المرجع'] || "");
       const rType = extractStr(rawRow.type || rawRow['رمز العملية'] || "");
 
-      // طباعة الأعمدة العادية متسنتّرة
       pen.text(safeShapeText(dateVal), TABLE_TEXT_X.date, rowY, 7.5, TEXT_COLOR, "center");
       pen.text(safeShapeText(rNotes), TABLE_TEXT_X.notes, rowY, 7.5, TEXT_COLOR, "center");
       pen.text(safeShapeText(rRef), TABLE_TEXT_X.ref, rowY, 7.5, TEXT_COLOR, "center");
@@ -203,38 +199,31 @@ export async function renderSnb({ doc, fonts, statement, onProgress }: TemplateA
       }
       pen.text(safeShapeText(balanceVal), TABLE_TEXT_X.balance, rowY, 7.5, TEXT_COLOR, "center");
 
-      // طباعة التفاصيل: دمج الوصف مع التفاصيل وقصهم لو السطر طويل عشان ما يضربش في العمود اللي جنبه
+      // طباعة التفاصيل: قص صارم لـ 38 حرف عشان ما يدخلش في المرجع والملاحظات
       const fullDetails = `${rDetails} ${rDesc}`.trim();
-      const detailLines = splitText(fullDetails, 42); // أقصى حد للسطر 42 حرف
+      const detailLines = splitText(fullDetails, 38); 
       
       let currentDetailY = rowY; 
-      for (let i = 0; i < Math.min(detailLines.length, 2); i++) { // أقصى حاجة سطرين عشان ما يخرجش بره الخلية
-        pen.text(safeShapeText(detailLines[i]), TABLE_TEXT_X.details, currentDetailY, 7.5, TEXT_COLOR, "right");
+      for (let i = 0; i < Math.min(detailLines.length, 2); i++) { // سطرين كحد أقصى
+        pen.text(safeShapeText(detailLines[i]), TABLE_TEXT_X.details, currentDetailY, 7, TEXT_COLOR, "right");
         currentDetailY -= 9; 
       }
       
       rowY -= FIXED_ROW_STEP;
     }
     
-    // --- طباعة المجاميع (في الصفحة الأخيرة تحت الجدول مباشرة) ---
+    // --- طباعة المجاميع (في الصفحة الأخيرة في مكانها المخصص) ---
     if (isLastPage) {
-      // نحسب الـ Y بتاع المجاميع بحيث يكون تحت آخر سطر وقفنا عنده بمسافة شيك
-      const SUMMARY_Y = rowY - 15; 
+      const SUMMARY_Y_COUNT = 115; // إحداثيات السطر اللي فيه "عدد المعاملات"
+      const SUMMARY_Y_AMOUNT = 98; // إحداثيات السطر اللي فيه "إجمالي المبلغ"
       const formatNum = (n: number) => n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
       
-      // بلوك المدين (يمين)
-      pen.text(shapeArabic("إجمالي معاملات المدين"), 820, SUMMARY_Y, 8.5, TEXT_COLOR, "right");
-      pen.text(shapeArabic("إجمالي المبلغ المدين"), 820, SUMMARY_Y - 15, 8.5, TEXT_COLOR, "right");
-      
-      pen.text(safeShapeText(String(withdrawalCount)), 710, SUMMARY_Y, 8.5, TEXT_COLOR, "right");
-      pen.text(safeShapeText("-" + formatNum(totalWithdrawals)), 710, SUMMARY_Y - 15, 8.5, RED, "right");
+      // رفعناهم فوق عشان ينزلوا جنب الكلام الأخضر المطبوع في القالب
+      pen.text(safeShapeText(String(withdrawalCount)), 120, SUMMARY_Y_COUNT, 8.5, TEXT_COLOR, "center");
+      pen.text(safeShapeText("-" + formatNum(totalWithdrawals)), 120, SUMMARY_Y_AMOUNT, 8.5, RED, "center");
 
-      // بلوك الدائن (شمال شوية)
-      pen.text(shapeArabic("إجمالي معاملات الدائن"), 550, SUMMARY_Y, 8.5, TEXT_COLOR, "right");
-      pen.text(shapeArabic("إجمالي المبلغ الدائن"), 550, SUMMARY_Y - 15, 8.5, TEXT_COLOR, "right");
-      
-      pen.text(safeShapeText(String(depositCount)), 440, SUMMARY_Y, 8.5, TEXT_COLOR, "right");
-      pen.text(safeShapeText(formatNum(totalDeposits)), 440, SUMMARY_Y - 15, 8.5, TEXT_COLOR, "right");
+      pen.text(safeShapeText(String(depositCount)), 470, SUMMARY_Y_COUNT, 8.5, TEXT_COLOR, "center");
+      pen.text(safeShapeText(formatNum(totalDeposits)), 470, SUMMARY_Y_AMOUNT, 8.5, TEXT_COLOR, "center");
     }
     
     onProgress?.((pageIndex + 1) / totalPages, `Composing page ${pageIndex + 1} of ${totalPages}`);
